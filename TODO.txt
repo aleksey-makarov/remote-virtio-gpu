@@ -1,0 +1,10 @@
+TODOs
+=====
+
+- Weston backend
+	- input
+	- cursor
+- use pthread_cancel() in input subsystem
+- sanitize error reporting
+- поправить доки, про nix, рассказать про VSYNC и про `nix run`
+- test VSYNC feature
