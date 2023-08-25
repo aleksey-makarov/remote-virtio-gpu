@@ -1,0 +1,29 @@
+From 59639e1db294454f49728c879b898aab8a8c1b78 Mon Sep 17 00:00:00 2001
+From: Aleksei Makarov <aleksei.makarov@opensynergy.com>
+Date: Sat, 17 Jun 2023 13:23:46 +0200
+Subject: [PATCH] drm: Use preferred mode if exist
+
+---
+ src/native-state-drm.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/native-state-drm.cpp b/src/native-state-drm.cpp
+index 97431c2..be3ca28 100644
+--- a/src/native-state-drm.cpp
++++ b/src/native-state-drm.cpp
+@@ -604,6 +604,12 @@ NativeStateDRM::init()
+     unsigned int bestArea(0);
+     for (int m = 0; m < connector_->count_modes; m++) {
+         drmModeModeInfo* curMode = &connector_->modes[m];
++
++        if (curMode->type & DRM_MODE_TYPE_PREFERRED) {
++            mode_ = curMode;
++            break;
++        }
++
+         unsigned int curArea = curMode->hdisplay * curMode->vdisplay;
+         if (curArea > bestArea) {
+             mode_ = curMode;
+-- 
+2.25.1
+

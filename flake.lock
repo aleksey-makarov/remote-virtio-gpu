@@ -1,0 +1,203 @@
+{
+  "nodes": {
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1673956053,
+        "narHash": "sha256-4gtG9iQuiKITOjNQQeQIpoIB6b16fm+504Ch3sNKLd8=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "35bb57c0c8d8b62bbfd284272c928ceb64ddbde9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1692799911,
+        "narHash": "sha256-3eihraek4qL744EvQXsK1Ha6C3CR7nnT8X2qWap4RNk=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "f9e7cf818399d17d347f847525c5a5a8032e4e44",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "kmscube": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nix-vscode-extensions": [
+          "nix-vscode-extensions"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1693406514,
+        "narHash": "sha256-O8ZCypfThw8sVvsNbM1yjik7WjO6sjdIl0s+5B2Qm9A=",
+        "owner": "aleksey-makarov",
+        "repo": "kmscube",
+        "rev": "3a0c1a0fbd81a7fa8098e7923190ca37373f2467",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aleksey-makarov",
+        "ref": "work",
+        "repo": "kmscube",
+        "type": "github"
+      }
+    },
+    "nix-vscode-extensions": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1693012544,
+        "narHash": "sha256-IKM0J9uP5/UFP6bKOwGCKCmJOi9ArwkiYmsjUXRX0HI=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "f9335f38e36fcca873e16cd2f29b30a315541abe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "type": "github"
+      }
+    },
+    "nixGL": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1685908677,
+        "narHash": "sha256-E4zUPEUFyVWjVm45zICaHRpfGepfkE9Z2OECV9HXfA4=",
+        "owner": "guibou",
+        "repo": "nixGL",
+        "rev": "489d6b095ab9d289fe11af0219a9ff00fe87c7c5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "guibou",
+        "repo": "nixGL",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1692808169,
+        "narHash": "sha256-x9Opq06rIiwdwGeK2Ykj69dNc2IvUH1fY55Wm7atwrE=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "9201b5ff357e781bf014d0330d18555695df7ba8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "flake-utils": "flake-utils",
+        "kmscube": "kmscube",
+        "nix-vscode-extensions": "nix-vscode-extensions",
+        "nixGL": "nixGL",
+        "nixpkgs": "nixpkgs",
+        "uhmitest": "uhmitest",
+        "virtio-lo": "virtio-lo"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "uhmitest": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nix-vscode-extensions": [
+          "nix-vscode-extensions"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1693402911,
+        "narHash": "sha256-/jIlG4LJxoSmngce/pRkgkaK6ZW2E4uNaexvrnDfXfQ=",
+        "owner": "aleksey-makarov",
+        "repo": "uhmitest",
+        "rev": "e7672e91c3f345cba696a7b8cf6131c8860e474c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aleksey-makarov",
+        "repo": "uhmitest",
+        "type": "github"
+      }
+    },
+    "virtio-lo": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1693075836,
+        "narHash": "sha256-cKvvB0vtCmfgp39a8ZeaReAHWMTOZhO/CnD6Kn49E6k=",
+        "owner": "aleksey-makarov",
+        "repo": "remote-virtio-gpu-driver",
+        "rev": "db0a6ca05ccbe3bd21b0502bca758a59ffa814a6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aleksey-makarov",
+        "ref": "work",
+        "repo": "remote-virtio-gpu-driver",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
