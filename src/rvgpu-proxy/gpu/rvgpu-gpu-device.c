@@ -37,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <uuid.h>
 
 #include <linux/virtio_config.h>
 #include <linux/virtio_gpu.h>
@@ -528,7 +529,8 @@ static struct gpu_device *gpu_device_init(int lo_fd, int efd, int capset,
 		.vendor_id = 0x1af4, /* PCI_VENDOR_ID_REDHAT_QUMRANET */
 		.config_size = sizeof(struct virtio_gpu_config),
 		.features =
-			bit64(VIRTIO_GPU_F_VIRGL) | bit64(VIRTIO_F_VERSION_1),
+			bit64(VIRTIO_GPU_F_VIRGL) | bit64(VIRTIO_F_VERSION_1)
+				| bit64(VIRTIO_GPU_F_RESOURCE_UUID),
 	};
 	if (params->framerate)
 		info.features |= bit64(VIRTIO_GPU_F_VSYNC);
@@ -892,6 +894,31 @@ static size_t gpu_device_serve_vsync(struct gpu_device *g)
 }
 #endif
 
+static void gpu_device_uuid(
+	struct gpu_device *g,
+	struct virtio_gpu_resource_assign_uuid *cmd,
+	struct virtio_gpu_resp_resource_uuid *resp)
+{
+	struct rvgpu_res *res;
+	struct rvgpu_backend *b = g->backend;
+
+	res = rvgpu_ctx_res_find(&b->ctx, cmd->resource_id);
+	if (!res) {
+		resp->hdr.type = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+		return;
+	}
+
+	if (!uuid_is_null(res->uuid)) {
+		resp->hdr.type = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+		return;
+	}
+
+	uuid_generate(res->uuid);
+
+	uuid_copy(resp->uuid, res->uuid);
+	resp->hdr.type = VIRTIO_GPU_RESP_OK_RESOURCE_UUID;
+}
+
 static int gpu_device_serve_fences(struct gpu_device *g)
 {
 	struct proxy_backend *p = g->proxy;
@@ -920,6 +947,7 @@ union virtio_gpu_resp {
 	struct virtio_gpu_resp_display_info rdi;
 	struct virtio_gpu_resp_capset_info ci;
 	struct virtio_gpu_resp_capset c;
+	struct virtio_gpu_resp_resource_uuid uuid;
 	uint8_t data[4096];
 };
 
@@ -1118,6 +1146,10 @@ int proxy_backend_go(struct gpu_device *g, struct proxy_backend_request *req, bo
 				req->resp_len = gpu_device_capset(
 					g, cmd.capset.capset_id,
 					cmd.capset.capset_version, &resp.c);
+				break;
+			case VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID:
+				gpu_device_uuid(g, &cmd.uuid, &resp.uuid);
+				req->resp_len = sizeof(resp.uuid);
 				break;
 			default:
 				break;

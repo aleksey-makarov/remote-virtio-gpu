@@ -21,6 +21,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <sys/queue.h>
+#include <uuid.h>
 
 #include <linux/virtio_gpu.h>
 
@@ -98,6 +99,7 @@ struct rvgpu_res {
 	struct iovec *backing;
 	unsigned int nbacking;
 	struct rvgpu_res_info info;
+	uuid_t uuid;
 
 	LIST_ENTRY(rvgpu_res) entry;
 };

@@ -35,5 +35,5 @@ target_compile_definitions(rvgpu-proxy PRIVATE
 	_FILE_OFFSET_BITS=64
 	_DEFAULT_SOURCE
 	_GNU_SOURCE)
-target_link_libraries(rvgpu-proxy PRIVATE pthread dl)
+target_link_libraries(rvgpu-proxy PRIVATE ${extlibs_LIBRARIES} pthread dl)
 install(TARGETS rvgpu-proxy RUNTIME DESTINATION bin)

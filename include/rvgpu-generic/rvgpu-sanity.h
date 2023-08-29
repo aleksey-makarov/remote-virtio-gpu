@@ -48,6 +48,7 @@ union virtio_gpu_cmd {
 	struct virtio_gpu_get_capset capset;
 	struct virtio_gpu_get_capset_info capset_info;
 	struct virtio_gpu_update_cursor cursor;
+	struct virtio_gpu_resource_assign_uuid uuid;
 	char buf[256 * 1024];
 };
 
