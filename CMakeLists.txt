@@ -30,7 +30,7 @@ if (CMAKE_SYSROOT AND NOT ENV{PKG_CONFIG_LIBDIR})
 endif(CMAKE_SYSROOT AND NOT ENV{PKG_CONFIG_LIBDIR})
 
 include(FindPkgConfig)
-pkg_check_modules(extlibs REQUIRED virglrenderer egl glesv2 wayland-client wayland-egl gbm libdrm libinput)
+pkg_check_modules(extlibs REQUIRED virglrenderer egl glesv2 wayland-client wayland-egl gbm libdrm libinput uuid)
 
 add_subdirectory(src)
 

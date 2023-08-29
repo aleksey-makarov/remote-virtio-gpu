@@ -190,6 +190,7 @@ int rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
 	res->resid = resource_id;
 	memcpy(&res->info, info, sizeof(*info));
 	res->info.bpp = 4u;
+	uuid_clear(res->uuid);
 	LIST_INSERT_HEAD(&ctx_priv->reslist, res, entry);
 
 	return 0;

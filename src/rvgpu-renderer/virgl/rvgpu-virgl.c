@@ -829,6 +829,8 @@ debug_end:
 		case VIRTIO_GPU_CMD_MOVE_CURSOR:
 			rvgpu_serve_move_cursor(p, &r.cursor);
 			break;
+		case VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID:
+			break;
 		default:
 			warnx("Unknown command %d", r.hdr.type);
 			return 0;

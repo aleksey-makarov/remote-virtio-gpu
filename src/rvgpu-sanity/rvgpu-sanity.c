@@ -342,6 +342,16 @@ enum virtio_gpu_ctrl_type sanity_check_gpu_ctrl(const union virtio_gpu_cmd *cmd,
 
 		return VIRTIO_GPU_RESP_OK_NODATA;
 
+	case VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID:
+
+		if (size != sizeof(cmd->uuid))
+			return VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+
+		if (cmd->uuid.resource_id == 0)
+			return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+
+		return VIRTIO_GPU_RESP_OK_NODATA;
+
 	/* cursor commands unsupported */
 	case VIRTIO_GPU_CMD_UPDATE_CURSOR:
 	case VIRTIO_GPU_CMD_MOVE_CURSOR:
