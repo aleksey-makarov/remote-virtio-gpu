@@ -28,7 +28,6 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-#include <rvgpu-proxy/gpu/rvgpu-gpu-device.h>
 #include <rvgpu-proxy/rvgpu-proxy.h>
 
 #include <librvgpu/rvgpu-plugin.h>
@@ -37,6 +36,7 @@
 #include <rvgpu-generic/rvgpu-sanity.h>
 #include <rvgpu-generic/rvgpu-utils.h>
 
+#include "gpu/rvgpu-gpu-device.h"
 #include "gpu/rvgpu-input-device.h"
 
 static void usage(void)
@@ -56,12 +56,12 @@ static void usage(void)
 
 int main(int argc, char **argv)
 {
-	struct gpu_device *dev;
 	struct input_device *inpdev;
 	struct rvgpu_backend *rvgpu_be = NULL;
 	int w, h, x , y;
 
-	struct gpu_device_params params = {
+	static struct gpu_device_params params = {
+		.capset_path = NULL,
 		.framerate = 0u,
 		.mem_limit = VMEM_DEFAULT_MB,
 		.card_index = -1,
@@ -83,15 +83,15 @@ int main(int argc, char **argv)
 
 	char path[64];
 	FILE *oomFile;
-	int lo_fd, epoll_fd, res, opt, capset = -1;
+	int res, opt;
 	char *ip, *port, *errstr = NULL;
 
 	while ((opt = getopt(argc, argv, "hi:n:M:c:R:f:s:")) != -1) {
 		switch (opt) {
 		case 'c':
-			capset = open(optarg, O_RDONLY);
-			if (capset == -1)
-				err(1, "open %s", optarg);
+			params.capset_path = strdup(optarg);
+			if (!params.capset_path)
+				err(1, "strdup()");
 			break;
 		case 'i':
 			params.card_index =
@@ -198,28 +198,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (capset == -1) {
-		capset = open(CAPSET_PATH, O_RDONLY);
-		if (capset == -1)
-			err(1, "%s", CAPSET_PATH);
-	}
-
 	if (servers.host_cnt == 0) {
 		servers.hosts[0].hostname = RVGPU_DEFAULT_HOSTNAME;
 		servers.hosts[0].portnum = RVGPU_DEFAULT_PORT;
 		servers.host_cnt = 1;
 	}
-
-	rvgpu_be = init_backend_rvgpu(&servers);
-	assert(rvgpu_be);
-
-	lo_fd = open(VIRTIO_LO_PATH, O_RDWR);
-	if (lo_fd == -1)
-		err(1, "%s", VIRTIO_LO_PATH);
-
-	epoll_fd = epoll_create(1);
-	if (epoll_fd == -1)
-		err(1, "epoll_create");
 
 	if (params.num_scanouts == 0)
 		params.num_scanouts = 1;
@@ -233,41 +216,19 @@ int main(int argc, char **argv)
 		fclose(oomFile);
 	}
 
-	dev = gpu_device_init(lo_fd, epoll_fd, capset, &params, rvgpu_be);
-	if (!dev)
-		err(1, "gpu device init");
+	rvgpu_be = init_backend_rvgpu(&servers);
+	assert(rvgpu_be);
 
 	inpdev = input_device_init(rvgpu_be);
 	if (!inpdev)
 		err(1, "input device init");
 
-	/* do the main_cycle */
-	for (;;) {
-		int i, n;
-		struct epoll_event events[8];
+	int ret = gpu_device_main(&params, rvgpu_be);
+	if (ret)
+		err(1, "gpu_device_main()");
 
-		n = epoll_wait(epoll_fd, events, ARRAY_SIZE(events), -1);
-
-		for (i = 0; i < n; i++) {
-			switch (events[i].data.u32) {
-			case PROXY_GPU_CONFIG:
-				gpu_device_config(dev);
-				break;
-			case PROXY_GPU_QUEUES:
-				gpu_device_serve(dev);
-				break;
-			default:
-				errx(1, "Uknown event!");
-			}
-		}
-	}
-
-	gpu_device_free(dev);
 	input_device_free(inpdev);
-
-	close(epoll_fd);
-	close(lo_fd);
-	close(capset);
+	destroy_backend_rvgpu(rvgpu_be);
 
 	return EXIT_SUCCESS;
 }

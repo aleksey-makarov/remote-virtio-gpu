@@ -34,6 +34,9 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <linux/virtio_config.h>
 #include <linux/virtio_gpu.h>
@@ -41,7 +44,7 @@
 #include <linux/virtio_lo.h>
 #include <linux/version.h>
 
-#include <rvgpu-proxy/gpu/rvgpu-gpu-device.h>
+#include <rvgpu-proxy/rvgpu-proxy.h>
 #include <rvgpu-proxy/gpu/rvgpu-iov.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
@@ -51,6 +54,10 @@
 
 #include <rvgpu-generic/rvgpu-capset.h>
 #include <rvgpu-generic/rvgpu-sanity.h>
+
+#include <rvgpu-generic/rvgpu-utils.h>
+
+#include "rvgpu-gpu-device.h"
 
 #define GPU_MAX_CAPDATA 16
 
@@ -136,6 +143,9 @@ struct cmd {
 	TAILQ_ENTRY(cmd) cmds;
 };
 
+#define PIPE_READ (0)
+#define PIPE_WRITE (1)
+
 struct async_resp {
 	TAILQ_HEAD(, cmd) async_cmds;
 	int fence_pipe[2];
@@ -170,6 +180,8 @@ struct gpu_device {
 	struct rvgpu_backend *backend;
 	struct async_resp *async_resp;
 };
+
+void backend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state);
 
 static inline uint64_t bit64(unsigned int shift)
 {
@@ -739,8 +751,6 @@ void gpu_device_free(struct gpu_device *g)
 #endif
 	close(g->config_fd);
 	close(g->kick_fd);
-	if (g->backend)
-		destroy_backend_rvgpu(g->backend);
 	destroy_async_resp(g);
 
 	free(g);
@@ -1344,3 +1354,66 @@ void gpu_device_serve(struct gpu_device *g)
 	gpu_device_serve_ctrl(g);
 	gpu_device_serve_cursor(g);
 }
+
+int gpu_device_main(struct gpu_device_params *params, struct rvgpu_backend *rvgpu_be)
+{
+	struct gpu_device *dev;
+	int lo_fd, epoll_fd;
+	int capset = -1;
+
+	assert(params);
+
+	if (params->capset_path) {
+		capset = open(params->capset_path, O_RDONLY);
+		if (capset == -1)
+			err(1, "open %s", optarg);
+	}
+
+	if (capset == -1) {
+		capset = open(CAPSET_PATH, O_RDONLY);
+		if (capset == -1)
+			err(1, "%s", CAPSET_PATH);
+	}
+
+	lo_fd = open(VIRTIO_LO_PATH, O_RDWR);
+	if (lo_fd == -1)
+		err(1, "%s", VIRTIO_LO_PATH);
+
+	epoll_fd = epoll_create(1);
+	if (epoll_fd == -1)
+		err(1, "epoll_create");
+
+	dev = gpu_device_init(lo_fd, epoll_fd, capset, params, rvgpu_be);
+	if (!dev)
+		err(1, "gpu device init");
+
+	/* do the main_cycle */
+	for (;;) {
+		int i, n;
+		struct epoll_event events[8];
+
+		n = epoll_wait(epoll_fd, events, ARRAY_SIZE(events), -1);
+
+		for (i = 0; i < n; i++) {
+			switch (events[i].data.u32) {
+			case PROXY_GPU_CONFIG:
+				gpu_device_config(dev);
+				break;
+			case PROXY_GPU_QUEUES:
+				gpu_device_serve(dev);
+				break;
+			default:
+				errx(1, "Uknown event!");
+			}
+		}
+	}
+
+	gpu_device_free(dev);
+
+	close(epoll_fd);
+	close(lo_fd);
+	close(capset);
+
+	return 0;
+}
+
