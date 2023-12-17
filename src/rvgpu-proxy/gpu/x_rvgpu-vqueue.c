@@ -21,8 +21,8 @@
 #include <assert.h>
 
 #include <rvgpu-proxy/gpu/rvgpu-iov.h>
-#include <rvgpu-proxy/gpu/rvgpu-map-guest.h>
-#include <rvgpu-proxy/gpu/rvgpu-vqueue.h>
+#include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
+#include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
 static struct vqueue_request *vqueue_init_request(void)
 {

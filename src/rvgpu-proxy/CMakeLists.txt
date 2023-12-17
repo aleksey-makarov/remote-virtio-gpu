@@ -19,8 +19,8 @@ add_executable(rvgpu-proxy
 	gpu/rvgpu-gpu-device.c
 	gpu/rvgpu-input-device.c
 	gpu/rvgpu-iov.c
-	gpu/rvgpu-map-guest.c
-	gpu/rvgpu-vqueue.c
+	gpu/x_rvgpu-map-guest.c
+	gpu/x_rvgpu-vqueue.c
 	rvgpu-proxy.c
 	$<TARGET_OBJECTS:rvgpu-sanity>)
 target_include_directories(rvgpu-proxy PRIVATE

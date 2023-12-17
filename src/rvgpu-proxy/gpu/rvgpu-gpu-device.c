@@ -43,8 +43,8 @@
 
 #include <rvgpu-proxy/gpu/rvgpu-gpu-device.h>
 #include <rvgpu-proxy/gpu/rvgpu-iov.h>
-#include <rvgpu-proxy/gpu/rvgpu-map-guest.h>
-#include <rvgpu-proxy/gpu/rvgpu-vqueue.h>
+#include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
+#include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
 #include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>

@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <sys/mman.h>
 
-#include <rvgpu-proxy/gpu/rvgpu-map-guest.h>
+#include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 
 static inline uint64_t align_to_page_down(uint64_t a)
 {
