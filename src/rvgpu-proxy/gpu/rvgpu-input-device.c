@@ -25,14 +25,16 @@
 #include <string.h>
 #include <sys/poll.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <rvgpu-generic/rvgpu-sanity.h>
 #include <rvgpu-generic/rvgpu-utils.h>
 
 #include <rvgpu-proxy/gpu/rvgpu-gpu-device.h>
-#include <rvgpu-proxy/gpu/rvgpu-input-device.h>
 
 #include <librvgpu/rvgpu-protocol.h>
+
+#include "rvgpu-input-device.h"
 
 #define UINPUT_PATH "/dev/uinput"
 
@@ -51,6 +53,8 @@ struct input_slot {
 };
 
 struct input_device {
+	pthread_t input_thread;
+	volatile bool thread_exit;
 	struct rvgpu_backend *backend;
 	short int revents[MAX_HOSTS];
 	int mouse, mouse_abs, keyboard, touch;
@@ -109,7 +113,7 @@ static const struct input_device_init keyboard[] = {
 	{ UI_SET_EVBIT, EV_KEY },
 };
 
-int input_wait(struct input_device *inpdev)
+static int input_wait(struct input_device *inpdev)
 {
 	struct rvgpu_backend *b = inpdev->backend;
 
@@ -124,7 +128,7 @@ int input_wait(struct input_device *inpdev)
 					       events, inpdev->revents);
 }
 
-int input_read(struct input_device *inpdev, void *buf, const size_t len,
+static int input_read(struct input_device *inpdev, void *buf, const size_t len,
 	       uint8_t *src)
 {
 	struct rvgpu_backend *b = inpdev->backend;
@@ -291,6 +295,8 @@ err_close:
 	return -1;
 }
 
+static void *input_thread_func(void *param);
+
 struct input_device *input_device_init(struct rvgpu_backend *b)
 {
 	struct input_device *g;
@@ -324,7 +330,16 @@ struct input_device *input_device_init(struct rvgpu_backend *b)
 
 	g->backend = b;
 
+	g->thread_exit = false;
+
+	int err = pthread_create(&g->input_thread, NULL, input_thread_func, g);
+	if (err)
+		goto err_close_keyboard;
+
 	return g;
+
+err_close_keyboard:
+	close(g->keyboard);
 err_close_touch:
 	close(g->touch);
 err_close_mouse_abs:
@@ -424,7 +439,7 @@ static void touch_translate(struct input_device *g, uint8_t src,
 		*ev = i;
 }
 
-void input_device_serve(struct input_device *g,
+static void input_device_serve(struct input_device *g,
 			const struct rvgpu_input_header *hdr,
 			const struct rvgpu_input_event *event)
 
@@ -470,6 +485,27 @@ void input_device_serve(struct input_device *g,
 	}
 }
 
+static void *input_thread_func(void *param)
+{
+	struct input_device *inpdev = (struct input_device *)param;
+	struct rvgpu_input_header hdr;
+
+	while (input_read(inpdev, &hdr, sizeof(hdr), &hdr.src) > 0) {
+
+		struct rvgpu_input_event uev[hdr.evnum];
+		ssize_t len = sizeof(uev[0]) * hdr.evnum;
+
+		if (inpdev->thread_exit)
+			break;
+
+		if (input_read(inpdev, uev, len, NULL) != len)
+			break;
+
+		input_device_serve(inpdev, &hdr, uev);
+	}
+	return NULL;
+}
+
 static void free_device(int fd)
 {
 	if (fd != -1) {
@@ -480,8 +516,12 @@ static void free_device(int fd)
 
 void input_device_free(struct input_device *g)
 {
-	if (!g)
-		return;
+	assert(g);
+
+	// FIXME: interrupt polling
+	g->thread_exit = true;
+	pthread_join(g->input_thread, NULL);
+
 	free_device(g->mouse);
 	free_device(g->mouse_abs);
 	free_device(g->keyboard);

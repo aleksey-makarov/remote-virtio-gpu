@@ -18,31 +18,7 @@
 #ifndef RVGPU_INPUT_DEVICE_H
 #define RVGPU_INPUT_DEVICE_H
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-
 struct input_device;
-struct rvgpu_input_event;
-struct rvgpu_input_header;
-
-/**
- * @brief poll for input events
- * @param inpdev - input device
- * @return number of occured events
- */
-int input_wait(struct input_device *inpdev);
-
-/**
- * @brief get input events
- * @param inpdev - input device
- * @param buf - pointer to read buffer
- * @param len - size of read buffer
- * @param src - source id
- * @return number of read bytes
- */
-int input_read(struct input_device *inpdev, void *buf, const size_t len,
-	       uint8_t *src);
 
 /**
  * @brief Initialize input device
@@ -50,16 +26,6 @@ int input_read(struct input_device *inpdev, void *buf, const size_t len,
  * @return pointer to initialized input device structure
  */
 struct input_device *input_device_init(struct rvgpu_backend *b);
-
-/**
- * @brief Process remote input event
- * @param g - pointer to initialized input device structure
- * @param hdr - input event header
- * @param event - remote event structure
- */
-void input_device_serve(struct input_device *g,
-			const struct rvgpu_input_header *hdr,
-			const struct rvgpu_input_event *event);
 
 /**
  * @brief Free input device resources

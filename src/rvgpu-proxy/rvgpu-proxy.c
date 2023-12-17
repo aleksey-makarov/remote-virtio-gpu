@@ -29,7 +29,6 @@
 #include <unistd.h>
 
 #include <rvgpu-proxy/gpu/rvgpu-gpu-device.h>
-#include <rvgpu-proxy/gpu/rvgpu-input-device.h>
 #include <rvgpu-proxy/rvgpu-proxy.h>
 
 #include <librvgpu/rvgpu-plugin.h>
@@ -37,6 +36,8 @@
 
 #include <rvgpu-generic/rvgpu-sanity.h>
 #include <rvgpu-generic/rvgpu-utils.h>
+
+#include "gpu/rvgpu-input-device.h"
 
 static void usage(void)
 {
@@ -51,22 +52,6 @@ static void usage(void)
 	info("\t-n\t\tserver:port for connecting (max 4 hosts, default: %s:%s)\n",
 	     RVGPU_DEFAULT_HOSTNAME, RVGPU_DEFAULT_PORT);
 	info("\t-h\t\tshow this message\n");
-}
-
-static void *input_thread_func(void *param)
-{
-	struct input_device *inpdev = (struct input_device *)param;
-	struct rvgpu_input_header hdr;
-
-	while (input_read(inpdev, &hdr, sizeof(hdr), &hdr.src) > 0) {
-		struct rvgpu_input_event uev[hdr.evnum];
-		ssize_t len = sizeof(uev[0]) * hdr.evnum;
-
-		if (input_read(inpdev, uev, len, NULL) != len)
-			break;
-		input_device_serve(inpdev, &hdr, uev);
-	}
-	return NULL;
 }
 
 int main(int argc, char **argv)
@@ -96,7 +81,6 @@ int main(int argc, char **argv)
 		.active = true,
 	};
 
-	pthread_t input_thread;
 	char path[64];
 	FILE *oomFile;
 	int lo_fd, epoll_fd, res, opt, capset = -1;
@@ -256,10 +240,6 @@ int main(int argc, char **argv)
 	inpdev = input_device_init(rvgpu_be);
 	if (!inpdev)
 		err(1, "input device init");
-	if (pthread_create(&input_thread, NULL, input_thread_func, inpdev) !=
-	    0) {
-		err(1, "input thread create");
-	}
 
 	/* do the main_cycle */
 	for (;;) {
