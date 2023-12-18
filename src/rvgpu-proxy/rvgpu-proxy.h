@@ -15,21 +15,9 @@
  * limitations under the License.
  */
 
-#ifndef RVGPU_GPU_DEVICE_H
-#define RVGPU_GPU_DEVICE_H
+#ifndef RVGPU_PROXY_H
+#define RVGPU_PROXY_H
 
-#include <linux/virtio_gpu.h>
+#define CAPSET_PATH "/etc/virgl.capset"
 
-struct gpu_device_params {
-	char *capset_path;
-	bool split_resources;
-	int card_index;
-	unsigned int num_scanouts;
-	unsigned int mem_limit;
-	unsigned long framerate;
-	struct virtio_gpu_display_one dpys[VIRTIO_GPU_MAX_SCANOUTS];
-};
-
-int gpu_device_main(struct gpu_device_params *param, struct rvgpu_backend *rvgpu_be);
-
-#endif /* RVGPU_GPU_DEVICE_H */
+#endif

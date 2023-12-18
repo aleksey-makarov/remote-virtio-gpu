@@ -28,16 +28,39 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-#include <rvgpu-proxy/rvgpu-proxy.h>
-
 #include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>
 
 #include <rvgpu-generic/rvgpu-sanity.h>
 #include <rvgpu-generic/rvgpu-utils.h>
 
+#include "rvgpu-proxy.h"
+#include "gpu/backend.h"
 #include "gpu/rvgpu-gpu-device.h"
 #include "gpu/rvgpu-input-device.h"
+
+#define DEFAULT_WIDTH 800u
+#define DEFAULT_HEIGHT 600u
+
+#define RVGPU_DEFAULT_HOSTNAME "127.0.0.1"
+#define RVGPU_DEFAULT_PORT "55667"
+
+#define VMEM_DEFAULT_MB 0
+
+#define RVGPU_DEFAULT_CONN_TMT_S 100u
+#define RVGPU_RECONN_INVL_MS 500u
+
+#define CARD_INDEX_MIN 0
+#define CARD_INDEX_MAX 64
+
+#define VMEM_MIN_MB 0
+#define VMEM_MAX_MB 4096u
+
+#define FRAMERATE_MIN 1u
+#define FRAMERATE_MAX 120u
+
+#define RVGPU_MIN_CONN_TMT_S 1u
+#define RVGPU_MAX_CONN_TMT_S 100u
 
 static void usage(void)
 {

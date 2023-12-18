@@ -16,7 +16,6 @@
  */
 
 #include <assert.h>
-#include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
 #include <limits.h>
@@ -44,7 +43,6 @@
 #include <linux/virtio_lo.h>
 #include <linux/version.h>
 
-#include <rvgpu-proxy/rvgpu-proxy.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
@@ -56,8 +54,10 @@
 
 #include <rvgpu-generic/rvgpu-utils.h>
 
+#include "../rvgpu-proxy.h"
 #include "rvgpu-iov.h"
 #include "rvgpu-gpu-device.h"
+#include "backend.h"
 
 #define GPU_MAX_CAPDATA 16
 
@@ -73,7 +73,9 @@
 #define VIRTIO_GPU_FLAG_VSYNC (1 << 2)
 #endif
 
-#define VERSION_SYMBOL_NAME "rvgpu_backend_version"
+enum { PROXY_GPU_CONFIG, PROXY_GPU_QUEUES };
+
+#define VIRTIO_LO_PATH "/dev/virtio-lo"
 
 /*
  * The commit 34268c9dde4 from linux kernel changes virtio_gpu_ctrl_hdr
@@ -106,30 +108,6 @@ static bool ok_to_use_vsync(void)
 	return major < 5;
 }
 #endif
-
-#define GPU_BE_FIND_PLUGIN_VERSION(ver)                                        \
-	do {                                                                   \
-		uint32_t *ver_ptr =                                            \
-			(uint32_t *)dlsym(plugin, VERSION_SYMBOL_NAME);        \
-		if (ver_ptr == NULL)                                           \
-			(ver) = 1u;                                            \
-		else                                                           \
-			(ver) = *ver_ptr;                                      \
-	} while (0)
-#define GPU_BE_PLUGIN_FIELD(plugin, field) plugin.ops.field
-#define GPU_BE_OPS_FIELD(ver, field)                                           \
-	GPU_BE_PLUGIN_FIELD(be->plugin_##ver, field)
-#define GPU_BE_FIND_SYMBOL_OR_FAIL(ver, symbol)                                \
-	do {                                                                   \
-		GPU_BE_OPS_FIELD(ver, symbol) =                                \
-			(typeof(GPU_BE_OPS_FIELD(ver, symbol)))(               \
-				uintptr_t)dlsym(plugin, #symbol);              \
-		if (GPU_BE_OPS_FIELD(ver, symbol) == NULL) {                   \
-			warnx("failed to find plugin symbol '%s': %s",         \
-			      #symbol, dlerror());                             \
-			goto err_sym;                                          \
-		}                                                              \
-	} while (0)
 
 struct gpu_capdata {
 	struct capset hdr;
@@ -181,14 +159,10 @@ struct gpu_device {
 	struct async_resp *async_resp;
 };
 
-void backend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state);
-
 static inline uint64_t bit64(unsigned int shift)
 {
 	return ((uint64_t)1) << shift;
 }
-static enum reset_state gpu_reset_state;
-
 int read_all(int fd, void *buf, size_t bytes)
 {
 	size_t offset = 0;
@@ -223,142 +197,6 @@ int write_all(int fd, const void *buf, size_t bytes)
 		}
 	}
 	return offset;
-}
-
-static int rvgpu_init_backends(struct rvgpu_backend *b,
-			       struct rvgpu_scanout_arguments *scanout_args)
-{
-	struct rvgpu_ctx *ctx = &b->plugin_v1.ctx;
-	void *plugin = b->lib_handle;
-	uint32_t version = b->plugin_version;
-
-	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
-		struct rvgpu_scanout *be = &b->plugin_v1.scanout[i];
-
-		switch (version) {
-		case RVGPU_BACKEND_V1:
-			GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_init);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_destroy);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_send);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_recv);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_recv_all);
-			break;
-		default:
-			err(1, "unsupported backend version: %u\n", version);
-			return -1;
-		}
-
-		be->plugin_v1.ops.rvgpu_init(ctx, be, scanout_args[i]);
-	}
-
-	return 0;
-err_sym:
-	return -1;
-}
-
-static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ctx_args)
-{
-	struct rvgpu_ctx *ctx = &b->plugin_v1.ctx;
-	struct rvgpu_backend *be = b;
-	void *plugin = b->lib_handle;
-	uint32_t version;
-
-	GPU_BE_FIND_PLUGIN_VERSION(version);
-
-	switch (version) {
-	case RVGPU_BACKEND_V1:
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_init);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_destroy);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_frontend_reset_state);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_wait);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_wakeup);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_poll);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_send);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_transfer_to_host);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_res_create);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_res_find);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(v1, rvgpu_ctx_res_destroy);
-		break;
-	default:
-		err(1, "unsupported backend version: %u", version);
-	}
-
-	be->plugin_version = version;
-	be->plugin_v1.ops.rvgpu_ctx_init(ctx, ctx_args, &backend_reset_state);
-
-	return 0;
-err_sym:
-	return -1;
-}
-
-#define STRINGIFY(s) STRINGIFY_(s)
-#define STRINGIFY_(s) #s
-
-struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
-{
-	struct rvgpu_scanout_arguments scanout_args[MAX_HOSTS] = { 0 };
-	struct rvgpu_backend *rvgpu_be;
-
-	rvgpu_be = calloc(1, sizeof(*rvgpu_be));
-	if (rvgpu_be == NULL) {
-		warnx("failed to allocate backend: %s", strerror(errno));
-		goto error;
-	}
-
-	char str_lib[] = "librvgpu.so." STRINGIFY(LIBRVGPU_SOVERSION);
-
-	/* Flush the current dl error state */
-	dlerror();
-
-	rvgpu_be->lib_handle = dlopen(str_lib, RTLD_NOW);
-	if (rvgpu_be->lib_handle == NULL) {
-		warnx("failed to open backend library '%s': %s", str_lib,
-		      dlerror());
-		goto error_free;
-	}
-
-	struct rvgpu_ctx_arguments ctx_args = {
-		.conn_tmt_s = servers->conn_tmt_s,
-		.reconn_intv_ms = servers->reconn_intv_ms,
-		.scanout_num = servers->host_cnt,
-	};
-
-	if (rvgpu_init_ctx(rvgpu_be, ctx_args)) {
-		warnx("failed to init rvgpu ctx");
-		goto error_dlclose;
-	}
-
-	for (unsigned int i = 0; i < servers->host_cnt; i++) {
-		scanout_args[i].tcp.ip = strdup(servers->hosts[i].hostname);
-		scanout_args[i].tcp.port = strdup(servers->hosts[i].portnum);
-	}
-
-	if (rvgpu_init_backends(rvgpu_be, scanout_args)) {
-		warnx("failed to init rvgpu backends");
-		goto error_dlclose;
-	}
-
-	return rvgpu_be;
-
-error_dlclose:
-	dlclose(rvgpu_be->lib_handle);
-error_free:
-	free(rvgpu_be);
-error:
-	return NULL;
-}
-
-void destroy_backend_rvgpu(struct rvgpu_backend *b)
-{
-	struct rvgpu_ctx *ctx = &b->plugin_v1.ctx;
-
-	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
-		struct rvgpu_scanout *s = &b->plugin_v1.scanout[i];
-
-		s->plugin_v1.ops.rvgpu_destroy(ctx, s);
-	}
-	b->plugin_v1.ops.rvgpu_ctx_destroy(ctx);
-	dlclose(b->lib_handle);
 }
 
 static void gpu_device_free_res(struct gpu_device *g, struct rvgpu_res *res)
@@ -939,12 +777,6 @@ static size_t gpu_device_capset(struct gpu_device *g, unsigned int capset_id,
 	return sizeof(c->hdr);
 }
 
-void backend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state)
-{
-	(void)ctx;
-	gpu_reset_state = state;
-}
-
 #ifdef VSYNC_ENABLE
 static unsigned long delta_time_nsec(struct timespec start,
 				     struct timespec stop)
@@ -1248,7 +1080,7 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 				break;
 			}
 		}
-		if (gpu_reset_state) {
+		if (backend_get_reset_state()) {
 			resp.hdr.type = VIRTIO_GPU_RESP_ERR_DEVICE_RESET;
 			reset = true;
 		}
@@ -1271,14 +1103,14 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 	if (reset) {
 		struct rvgpu_ctx *ctx = &b->plugin_v1.ctx;
 
-		if (gpu_reset_state == GPU_RESET_NONE) {
+		if (backend_get_reset_state() == GPU_RESET_NONE) {
 			reset = false;
 			b->plugin_v1.ops.rvgpu_ctx_wait(ctx, GPU_RESET_NONE);
 
-		} else if (gpu_reset_state == GPU_RESET_TRUE) {
+		} else if (backend_get_reset_state() == GPU_RESET_TRUE) {
 			b->plugin_v1.ops.rvgpu_frontend_reset_state(
 				ctx, GPU_RESET_INITIATED);
-			gpu_reset_state = GPU_RESET_INITIATED;
+			backend_set_reset_state_initiated();
 			b->plugin_v1.ops.rvgpu_ctx_wakeup(ctx);
 		}
 	}

@@ -51,7 +51,7 @@ stdenv.mkDerivation rec {
   capset = ./settings/virgl.capset;
 
   postPatch = ''
-    substituteInPlace include/rvgpu-proxy/rvgpu-proxy.h      --replace /etc/virgl.capset $capset
+    substituteInPlace src/rvgpu-proxy/rvgpu-proxy.h          --replace /etc/virgl.capset $capset
     substituteInPlace src/rvgpu-proxy/gpu/rvgpu-gpu-device.c --replace librvgpu.so       $out/lib/librvgpu.so
   '';
 

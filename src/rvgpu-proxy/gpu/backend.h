@@ -15,37 +15,10 @@
  * limitations under the License.
  */
 
-#ifndef RVGPU_PROXY_H
-#define RVGPU_PROXY_H
+#ifndef __backend_h__
+#define __backend_h__
 
 #include <librvgpu/rvgpu-plugin.h>
-
-#define RVGPU_MIN_CONN_TMT_S 1u
-#define RVGPU_MAX_CONN_TMT_S 100u
-#define RVGPU_DEFAULT_CONN_TMT_S 100u
-
-#define RVGPU_RECONN_INVL_MS 500u
-
-#define DEFAULT_WIDTH 800u
-#define DEFAULT_HEIGHT 600u
-
-#define CARD_INDEX_MIN 0
-#define CARD_INDEX_MAX 64
-
-#define VMEM_MIN_MB 0
-#define VMEM_DEFAULT_MB 0
-#define VMEM_MAX_MB 4096u
-
-#define FRAMERATE_MIN 1u
-#define FRAMERATE_MAX 120u
-
-#define RVGPU_DEFAULT_HOSTNAME "127.0.0.1"
-#define RVGPU_DEFAULT_PORT "55667"
-
-#define CAPSET_PATH "/etc/virgl.capset"
-#define VIRTIO_LO_PATH "/dev/virtio-lo"
-
-enum { PROXY_GPU_CONFIG, PROXY_GPU_QUEUES };
 
 struct host_server {
 	char *hostname;
@@ -59,5 +32,26 @@ struct host_conn {
 	unsigned int reconn_intv_ms;
 	bool active;
 };
+
+/**
+ * @brief Initialize rvgpu backend
+ *
+ * @param servers - pointer to remote targets settings
+ *
+ * @return pointer to rvgpu backend
+ */
+struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers);
+
+/**
+ * @brief Destroy rvgpu backend
+ *
+ * @param b - pointer to rvgpu backend
+ *
+ * @return void
+ */
+void destroy_backend_rvgpu(struct rvgpu_backend *b);
+
+enum reset_state backend_get_reset_state(void);
+void backend_set_reset_state_initiated(void);
 
 #endif /* RVGPU_PROXY_H */
