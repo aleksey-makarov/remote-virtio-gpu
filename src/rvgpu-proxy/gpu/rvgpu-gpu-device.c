@@ -45,7 +45,6 @@
 #include <linux/version.h>
 
 #include <rvgpu-proxy/rvgpu-proxy.h>
-#include <rvgpu-proxy/gpu/rvgpu-iov.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
@@ -57,6 +56,7 @@
 
 #include <rvgpu-generic/rvgpu-utils.h>
 
+#include "rvgpu-iov.h"
 #include "rvgpu-gpu-device.h"
 
 #define GPU_MAX_CAPDATA 16
