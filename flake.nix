@@ -103,7 +103,7 @@
 
     renderer_h = 800;
     renderer_w = 1280;
-    wayland_socket_name="wayland-nix";
+    wayland_socket_name = "wayland-nix";
 
     startrend_sh = pkgs.writeScriptBin "startrend.sh" ''
       #!${pkgs.bash}/bin/bash
@@ -157,6 +157,18 @@
         # '';
       };
       default = remote-virtio-gpu;
+    };
+
+    apps.${system} = rec {
+      startvm = {
+        type = "app";
+        program = "${startvm_sh}/bin/startvm.sh";
+      };
+      startrend = {
+        type = "app";
+        program = "${startrend_sh}/bin/startrend.sh";
+      };
+      default = startvm;
     };
   };
 }
