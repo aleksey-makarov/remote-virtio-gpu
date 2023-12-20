@@ -14,6 +14,7 @@
   libpng,
   libjpeg,
   linuxPackages,
+  linuxHeaders,
   libuuid,
 }:
 stdenv.mkDerivation rec {
@@ -42,8 +43,8 @@ stdenv.mkDerivation rec {
     libdrm.dev
     mesa.dev
     libGL.dev
+    linuxHeaders
     linuxPackages.virtio-lo.dev
-    linuxPackages.kernel.dev
     libuuid.dev
   ];
 

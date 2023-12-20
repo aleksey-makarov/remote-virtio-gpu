@@ -144,7 +144,20 @@
     '';
   in {
     packages.${system} = rec {
+      linuxHeaders_5_10 = pkgs.linuxHeaders.overrideAttrs rec {
+        version = "5.10.191";
+        src = pkgs.fetchurl {
+          url = "mirror://kernel/linux/kernel/v5.x/linux-${version}.tar.xz";
+          hash = "sha256-y1RmDtSRfMT5qauT0Rfe/v2Ly+dF7GCC2Qm7/VrpYsI=";
+        };
+      };
+
       remote-virtio-gpu = pkgs.callPackage ./default.nix {};
+
+      remote-virtio-gpu-linux_5_10 = pkgs.callPackage ./default.nix {
+        linuxHeaders = linuxHeaders_5_10;
+      };
+
       default = remote-virtio-gpu;
     };
 
@@ -152,9 +165,12 @@
       remote-virtio-gpu = pkgs.mkShell {
         packages = [vscode startvm_sh startrend_sh];
         inputsFrom = builtins.attrValues self.packages.${system};
-        # shellHook = ''
-        #   printf "gst:     ${pkgs.gst_all_1.gstreamer}\n"
-        # '';
+        shellHook = ''
+          echo "gst: ${pkgs.gst_all_1.gstreamer}"
+          echo "kernel version: ${pkgs.linuxPackages.kernel.modDirVersion}"
+          echo "linuxHeaders: ${pkgs.linuxHeaders}"
+          echo "linuxHeaders_5_10: ${self.packages.${system}.linuxHeaders_5_10}"
+        '';
       };
       default = remote-virtio-gpu;
     };
