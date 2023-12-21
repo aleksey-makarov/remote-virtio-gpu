@@ -260,7 +260,7 @@ int rvgpu_send(struct rvgpu_scanout *scanout, enum pipe_type p, const void *buf,
  *
  *  @return void
  */
-void rvgpu_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state);
+void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state);
 
 void *thread_conn_tcp(void *arg);
 

@@ -223,7 +223,7 @@ void rvgpu_destroy(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout)
 	}
 }
 
-void rvgpu_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state)
+void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state)
 {
 	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
 

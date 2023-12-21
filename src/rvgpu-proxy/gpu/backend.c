@@ -50,7 +50,7 @@ static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ct
 
 	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_init);
 	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_destroy);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_frontend_reset_state);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_frontend_reset_state);
 	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wait);
 	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wakeup);
 	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_poll);

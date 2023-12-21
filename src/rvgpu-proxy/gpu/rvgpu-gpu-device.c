@@ -1113,7 +1113,7 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 			b->ops.rvgpu_ctx_wait(ctx, GPU_RESET_NONE);
 
 		} else if (backend_get_reset_state() == GPU_RESET_TRUE) {
-			b->ops.rvgpu_frontend_reset_state(
+			b->ops.rvgpu_ctx_frontend_reset_state(
 				ctx, GPU_RESET_INITIATED);
 			backend_set_reset_state_initiated();
 			b->ops.rvgpu_ctx_wakeup(ctx);

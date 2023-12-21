@@ -126,9 +126,7 @@ struct rvgpu_rendering_ctx_ops {
 			      void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
 						   enum reset_state state));
 	void (*rvgpu_ctx_destroy)(struct rvgpu_ctx *ctx);
-	void (*rvgpu_backend_reset_state)(struct rvgpu_ctx *ctx,
-					  enum reset_state state);
-	void (*rvgpu_frontend_reset_state)(struct rvgpu_ctx *ctx,
+	void (*rvgpu_ctx_frontend_reset_state)(struct rvgpu_ctx *ctx,
 					   enum reset_state state);
 	void (*rvgpu_ctx_wait)(struct rvgpu_ctx *ctx, enum reset_state state);
 	void (*rvgpu_ctx_wakeup)(struct rvgpu_ctx *ctx);
