@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 
+#include <librvgpu/rvgpu.h>
 #include <librvgpu/rvgpu-plugin.h>
 
 #define MAX_HOSTS 16
@@ -113,7 +114,7 @@ void rvgpu_ctx_destroy(struct rvgpu_ctx *ctx);
  *
  *  @return void
  */
-void rvgpu_ctx_wait(struct ctx_priv *ctx, enum reset_state state);
+void rvgpu_ctx_wait(struct rvgpu_ctx *ctx, enum reset_state state);
 
 /** @brief Wakeup a ctx from rvgpu_ctx_wait function
  *
@@ -122,7 +123,7 @@ void rvgpu_ctx_wait(struct ctx_priv *ctx, enum reset_state state);
  *
  *  @return void
  */
-void rvgpu_ctx_wakeup(struct ctx_priv *ctx);
+void rvgpu_ctx_wakeup(struct rvgpu_ctx *ctx);
 
 /** @brief Poll for ctx events
  *

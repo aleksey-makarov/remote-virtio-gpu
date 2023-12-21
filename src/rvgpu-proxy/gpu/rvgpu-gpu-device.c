@@ -46,6 +46,7 @@
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
+#include <librvgpu/rvgpu.h>
 #include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>
 
@@ -324,7 +325,7 @@ static int wait_resource_events(struct rvgpu_backend *b, short int *revents)
 	memset(events, POLLIN,
 	       sizeof(short int) * b->ctx.scanout_num);
 
-	return b->ops.rvgpu_ctx_poll(&b->ctx, RESOURCE, -1,
+	return rvgpu_ctx_poll(&b->ctx, RESOURCE, -1,
 					       events, revents);
 }
 
@@ -335,12 +336,12 @@ static void gpu_device_send_command(struct rvgpu_backend *u, void *buf,
 	int ret;
 
 	if (notify_all) {
-		if (u->ops.rvgpu_ctx_send(&u->ctx, buf, size)) {
+		if (rvgpu_ctx_send(&u->ctx, buf, size)) {
 			warn("short write");
 		}
 	} else {
 		s = &u->scanout[0];
-		ret = s->ops.rvgpu_send(s, COMMAND, buf, size);
+		ret = rvgpu_send(s, COMMAND, buf, size);
 
 		if (ret != (int)size)
 			warn("short write");
@@ -353,7 +354,7 @@ static void read_from_pipe(struct rvgpu_scanout *s, char *buf, size_t size)
 	int ret = 0;
 
 	while (offset < size) {
-		ret = s->ops.rvgpu_recv(
+		ret = rvgpu_recv(
 		    s, RESOURCE, (buf) ? buf + offset : buf, size - offset);
 
 		if (ret == (int)size)
@@ -402,7 +403,7 @@ static void resource_transfer(struct gpu_device *g, struct rvgpu_scanout *s)
 	read_from_pipe(s, (char *)&t, sizeof(t));
 	read_from_pipe(s, (char *)&patch, sizeof(patch));
 
-	res = g->backend->ops.rvgpu_ctx_res_find(
+	res = rvgpu_ctx_res_find(
 	    &g->backend->ctx, t.resource_id);
 
 	if (!res || !res->backing) {
@@ -438,7 +439,7 @@ static void *resource_thread_func(void *param)
 				struct rvgpu_scanout *s =
 					&b->scanout[i];
 
-				ssize_t ret = s->ops.rvgpu_recv_all(
+				ssize_t ret = rvgpu_recv_all(
 					s, RESOURCE, &msg, sizeof(msg));
 				assert(ret > 0);
 				(void)ret;
@@ -625,11 +626,11 @@ static unsigned int gpu_device_create_res(struct gpu_device *g,
 	struct rvgpu_backend *b = g->backend;
 	struct rvgpu_res *res;
 
-	res = b->ops.rvgpu_ctx_res_find(&b->ctx, resid);
+	res = rvgpu_ctx_res_find(&b->ctx, resid);
 	if (res != NULL)
 		return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
 
-	if (b->ops.rvgpu_ctx_res_create(&b->ctx, info, resid))
+	if (rvgpu_ctx_res_create(&b->ctx, info, resid))
 		return VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY;
 
 	return VIRTIO_GPU_RESP_OK_NODATA;
@@ -641,12 +642,12 @@ static unsigned int gpu_device_destroy_res(struct gpu_device *g,
 	struct rvgpu_backend *b = g->backend;
 	struct rvgpu_res *res;
 
-	res = b->ops.rvgpu_ctx_res_find(&b->ctx, resid);
+	res = rvgpu_ctx_res_find(&b->ctx, resid);
 	if (res == NULL)
 		return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
 
 	gpu_device_free_res(g, res);
-	b->ops.rvgpu_ctx_res_destroy(&b->ctx, resid);
+	rvgpu_ctx_res_destroy(&b->ctx, resid);
 	return VIRTIO_GPU_RESP_OK_NODATA;
 }
 
@@ -656,7 +657,7 @@ static void gpu_device_send_patched(struct gpu_device *g,
 {
 	struct rvgpu_backend *b = g->backend;
 
-	if (b->ops.rvgpu_ctx_transfer_to_host(&b->ctx, t, res)) {
+	if (rvgpu_ctx_transfer_to_host(&b->ctx, t, res)) {
 		warn("short write");
 	}
 }
@@ -668,7 +669,7 @@ static unsigned int gpu_device_send_res(struct gpu_device *g,
 	struct rvgpu_backend *b = g->backend;
 	struct rvgpu_res *res;
 
-	res = b->ops.rvgpu_ctx_res_find(&b->ctx, resid);
+	res = rvgpu_ctx_res_find(&b->ctx, resid);
 	if (!res)
 		return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
 
@@ -689,7 +690,7 @@ static unsigned int gpu_device_attach(struct gpu_device *g, unsigned int resid,
 	unsigned int i;
 	size_t sentsize = 0u;
 
-	res = b->ops.rvgpu_ctx_res_find(&b->ctx, resid);
+	res = rvgpu_ctx_res_find(&b->ctx, resid);
 	if (!res)
 		return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
 
@@ -732,7 +733,7 @@ static unsigned int gpu_device_detach(struct gpu_device *g, unsigned int resid)
 	struct rvgpu_res *res;
 	unsigned int i;
 
-	res = b->ops.rvgpu_ctx_res_find(&b->ctx, resid);
+	res = rvgpu_ctx_res_find(&b->ctx, resid);
 	if (!res)
 		return VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
 
@@ -1110,13 +1111,13 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 
 		if (backend_get_reset_state() == GPU_RESET_NONE) {
 			reset = false;
-			b->ops.rvgpu_ctx_wait(ctx, GPU_RESET_NONE);
+			rvgpu_ctx_wait(ctx, GPU_RESET_NONE);
 
 		} else if (backend_get_reset_state() == GPU_RESET_TRUE) {
-			b->ops.rvgpu_ctx_frontend_reset_state(
+			rvgpu_ctx_frontend_reset_state(
 				ctx, GPU_RESET_INITIATED);
 			backend_set_reset_state_initiated();
-			b->ops.rvgpu_ctx_wakeup(ctx);
+			rvgpu_ctx_wakeup(ctx);
 		}
 	}
 }

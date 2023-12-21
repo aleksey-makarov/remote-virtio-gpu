@@ -5,24 +5,9 @@
 #include <string.h>
 #include <errno.h>
 
+#include <librvgpu/rvgpu.h>
+
 #include "backend.h"
-
-#define GPU_BE_OPS_FIELD(field) ((be)->ops.field)
-#define GPU_BE_FIND_SYMBOL_OR_FAIL(symbol)                             \
-	do {                                                           \
-		GPU_BE_OPS_FIELD(symbol) =                             \
-			(typeof(GPU_BE_OPS_FIELD(symbol)))(            \
-				uintptr_t)dlsym(plugin, #symbol);      \
-		if (GPU_BE_OPS_FIELD(symbol) == NULL) {                \
-			warnx("failed to find plugin symbol '%s': %s", \
-			      #symbol, dlerror());                     \
-			goto err_sym;                                  \
-		}                                                      \
-	} while (0)
-
-
-#define STRINGIFY(s) STRINGIFY_(s)
-#define STRINGIFY_(s) #s
 
 static enum reset_state gpu_reset_state;
 
@@ -45,49 +30,24 @@ void backend_set_reset_state_initiated(void)
 static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ctx_args)
 {
 	struct rvgpu_ctx *ctx = &b->ctx;
-	struct rvgpu_backend *be = b;
-	void *plugin = b->lib_handle;
 
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_init);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_destroy);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_frontend_reset_state);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wait);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wakeup);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_poll);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_send);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_transfer_to_host);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_create);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_find);
-	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_destroy);
-
-	be->ops.rvgpu_ctx_init(ctx, ctx_args, &backend_reset_state);
+	rvgpu_ctx_init(ctx, ctx_args, &backend_reset_state);
 
 	return 0;
-err_sym:
-	return -1;
 }
 
 static int rvgpu_init_backends(struct rvgpu_backend *b,
 			       struct rvgpu_scanout_arguments *scanout_args)
 {
 	struct rvgpu_ctx *ctx = &b->ctx;
-	void *plugin = b->lib_handle;
 
 	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
 		struct rvgpu_scanout *be = &b->scanout[i];
 
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_init);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_destroy);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_send);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv_all);
-
-		be->ops.rvgpu_init(ctx, be, scanout_args[i]);
+		rvgpu_init(ctx, be, scanout_args[i]);
 	}
 
 	return 0;
-err_sym:
-	return -1;
 }
 
 struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
@@ -98,19 +58,7 @@ struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
 	rvgpu_be = calloc(1, sizeof(*rvgpu_be));
 	if (rvgpu_be == NULL) {
 		warnx("failed to allocate backend: %s", strerror(errno));
-		goto error;
-	}
-
-	char str_lib[] = "librvgpu.so." STRINGIFY(LIBRVGPU_SOVERSION);
-
-	/* Flush the current dl error state */
-	dlerror();
-
-	rvgpu_be->lib_handle = dlopen(str_lib, RTLD_NOW);
-	if (rvgpu_be->lib_handle == NULL) {
-		warnx("failed to open backend library '%s': %s", str_lib,
-		      dlerror());
-		goto error_free;
+		goto err;
 	}
 
 	struct rvgpu_ctx_arguments ctx_args = {
@@ -121,7 +69,7 @@ struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
 
 	if (rvgpu_init_ctx(rvgpu_be, ctx_args)) {
 		warnx("failed to init rvgpu ctx");
-		goto error_dlclose;
+		goto err_free;
 	}
 
 	for (unsigned int i = 0; i < servers->host_cnt; i++) {
@@ -131,16 +79,14 @@ struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
 
 	if (rvgpu_init_backends(rvgpu_be, scanout_args)) {
 		warnx("failed to init rvgpu backends");
-		goto error_dlclose;
+		goto err_free;
 	}
 
 	return rvgpu_be;
 
-error_dlclose:
-	dlclose(rvgpu_be->lib_handle);
-error_free:
+err_free:
 	free(rvgpu_be);
-error:
+err:
 	return NULL;
 }
 
@@ -151,8 +97,7 @@ void destroy_backend_rvgpu(struct rvgpu_backend *b)
 	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
 		struct rvgpu_scanout *s = &b->scanout[i];
 
-		s->ops.rvgpu_destroy(ctx, s);
+		rvgpu_destroy(ctx, s);
 	}
-	b->ops.rvgpu_ctx_destroy(ctx);
-	dlclose(b->lib_handle);
+	rvgpu_ctx_destroy(ctx);
 }

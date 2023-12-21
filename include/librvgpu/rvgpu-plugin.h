@@ -120,54 +120,50 @@ struct rvgpu_res_transfer {
 	uint64_t offset;
 };
 
-struct rvgpu_rendering_ctx_ops {
-	int (*rvgpu_ctx_init)(struct rvgpu_ctx *ctx,
-			      struct rvgpu_ctx_arguments args,
-			      void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
-						   enum reset_state state));
-	void (*rvgpu_ctx_destroy)(struct rvgpu_ctx *ctx);
-	void (*rvgpu_ctx_frontend_reset_state)(struct rvgpu_ctx *ctx,
-					   enum reset_state state);
-	void (*rvgpu_ctx_wait)(struct rvgpu_ctx *ctx, enum reset_state state);
-	void (*rvgpu_ctx_wakeup)(struct rvgpu_ctx *ctx);
-	int (*rvgpu_ctx_poll)(struct rvgpu_ctx *ctx, enum pipe_type p,
-			      int timeo, short int *events, short int *revents);
-	int (*rvgpu_ctx_send)(struct rvgpu_ctx *ctx, const void *buf,
-			      size_t len);
-	struct rvgpu_res *(*rvgpu_ctx_res_find)(struct rvgpu_ctx *ctx,
-						uint32_t resource_id);
-	int (*rvgpu_ctx_transfer_to_host)(struct rvgpu_ctx *ctx,
-					  const struct rvgpu_res_transfer *t,
-					  const struct rvgpu_res *res);
-	int (*rvgpu_ctx_res_create)(struct rvgpu_ctx *ctx,
-				    const struct rvgpu_res_info *res,
-				    uint32_t resource_id);
-	void (*rvgpu_ctx_res_destroy)(struct rvgpu_ctx *ctx,
-				      uint32_t resource_id);
-};
+#if 0
+int  rvgpu_ctx_init(struct rvgpu_ctx *ctx,
+		      struct rvgpu_ctx_arguments args,
+		      void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
+					   enum reset_state state));
+void rvgpu_ctx_destroy(struct rvgpu_ctx *ctx);
+void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx,
+				   enum reset_state state);
+void rvgpu_ctx_wait(struct rvgpu_ctx *ctx, enum reset_state state);
+void rvgpu_ctx_wakeup(struct rvgpu_ctx *ctx);
+int  rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p,
+		      int timeo, short int *events, short int *revents);
+int  rvgpu_ctx_send(struct rvgpu_ctx *ctx, const void *buf,
+		      size_t len);
+struct rvgpu_res *
+     rvgpu_ctx_res_find(struct rvgpu_ctx *ctx,
+					uint32_t resource_id);
+int  rvgpu_ctx_transfer_to_host(struct rvgpu_ctx *ctx,
+				  const struct rvgpu_res_transfer *t,
+				  const struct rvgpu_res *res);
+int  rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
+			    const struct rvgpu_res_info *res,
+			    uint32_t resource_id);
+void rvgpu_ctx_res_destroy(struct rvgpu_ctx *ctx,
+			      uint32_t resource_id);
 
-struct rvgpu_rendering_backend_ops {
-	int (*rvgpu_init)(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout,
-			  struct rvgpu_scanout_arguments args);
-	void (*rvgpu_destroy)(struct rvgpu_ctx *ctx,
-			      struct rvgpu_scanout *scanout);
-	int (*rvgpu_send)(struct rvgpu_scanout *scanout, enum pipe_type p,
-			  const void *buf, size_t len);
-	int (*rvgpu_recv)(struct rvgpu_scanout *scanout, enum pipe_type p,
-			  void *buf, size_t len);
-	int (*rvgpu_recv_all)(struct rvgpu_scanout *scanout, enum pipe_type p,
-			      void *buf, size_t len);
-};
+int  rvgpu_init(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout,
+		  struct rvgpu_scanout_arguments args);
+void rvgpu_destroy(struct rvgpu_ctx *ctx,
+		      struct rvgpu_scanout *scanout);
+int  rvgpu_send(struct rvgpu_scanout *scanout, enum pipe_type p,
+		  const void *buf, size_t len);
+int  rvgpu_recv(struct rvgpu_scanout *scanout, enum pipe_type p,
+		  void *buf, size_t len);
+int  rvgpu_recv_all(struct rvgpu_scanout *scanout, enum pipe_type p,
+		      void *buf, size_t len);
+#endif
 
 struct rvgpu_scanout {
 	uint32_t scanout_id;
-	struct rvgpu_rendering_backend_ops ops;
 	void *priv;
 };
 
 struct rvgpu_backend {
-	void *lib_handle;
-	struct rvgpu_rendering_ctx_ops ops;
 	struct rvgpu_ctx ctx;
 	struct rvgpu_scanout scanout[MAX_HOSTS];
 };

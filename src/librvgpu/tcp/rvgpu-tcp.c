@@ -301,7 +301,7 @@ static void set_timer(int timerfd, unsigned int msec)
 		warn("Failed to set timerfd");
 }
 
-void rvgpu_ctx_wait(struct ctx_priv *ctx, enum reset_state state)
+static void rvgpu_ctx_wait_(struct ctx_priv *ctx, enum reset_state state)
 {
 	pthread_mutex_lock(&ctx->reset.lock);
 	while (ctx->reset.state != state)
@@ -309,11 +309,21 @@ void rvgpu_ctx_wait(struct ctx_priv *ctx, enum reset_state state)
 	pthread_mutex_unlock(&ctx->reset.lock);
 }
 
-void rvgpu_ctx_wakeup(struct ctx_priv *ctx)
+void rvgpu_ctx_wait(struct rvgpu_ctx *ctx, enum reset_state state)
+{
+	rvgpu_ctx_wait_(ctx->priv, state);
+}
+
+static void rvgpu_ctx_wakeup_(struct ctx_priv *ctx)
 {
 	pthread_mutex_lock(&ctx->reset.lock);
 	pthread_cond_signal(&ctx->reset.cond);
 	pthread_mutex_unlock(&ctx->reset.lock);
+}
+
+void rvgpu_ctx_wakeup(struct rvgpu_ctx *ctx)
+{
+	rvgpu_ctx_wakeup_(ctx->priv);
 }
 
 static void disconnect(struct vgpu_host *vhost[], unsigned int cmd_cnt,
@@ -346,7 +356,7 @@ static void handle_reset(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 {
 	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
 
-	rvgpu_ctx_wait(ctx_priv, GPU_RESET_INITIATED);
+	rvgpu_ctx_wait_(ctx_priv, GPU_RESET_INITIATED);
 
 	reconnect_all(vhost, host_count);
 
@@ -359,7 +369,7 @@ static void handle_reset(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 	 * may lead rvgpu-renderer to miss resources from rvgpu-proxy.
 	 */
 	usleep(100 * 1000);
-	rvgpu_ctx_wakeup(ctx_priv);
+	rvgpu_ctx_wakeup_(ctx_priv);
 }
 
 static bool sessions_hung(struct ctx_priv *ctx, struct vgpu_host *vhost[],

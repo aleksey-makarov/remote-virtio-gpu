@@ -123,7 +123,7 @@ static int input_wait(struct input_device *inpdev)
 	memset(events, POLLIN,
 	       sizeof(short int) * b->ctx.scanout_num);
 
-	return b->ops.rvgpu_ctx_poll(&b->ctx, COMMAND, -1, events, inpdev->revents);
+	return rvgpu_ctx_poll(&b->ctx, COMMAND, -1, events, inpdev->revents);
 }
 
 static int input_read(struct input_device *inpdev, void *buf, const size_t len,
@@ -137,7 +137,7 @@ static int input_read(struct input_device *inpdev, void *buf, const size_t len,
 	for (int i = 0; i < b->ctx.scanout_num; i++) {
 		if (inpdev->revents[i] & POLLIN) {
 			struct rvgpu_scanout *s = &b->scanout[i];
-			ssize_t ret = s->ops.rvgpu_recv_all(s, COMMAND, buf, len);
+			ssize_t ret = rvgpu_recv_all(s, COMMAND, buf, len);
 			if (ret > 0) {
 				if (src)
 					*src = i;
