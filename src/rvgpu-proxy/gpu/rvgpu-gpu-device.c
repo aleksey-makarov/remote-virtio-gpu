@@ -163,7 +163,8 @@ static inline uint64_t bit64(unsigned int shift)
 {
 	return ((uint64_t)1) << shift;
 }
-int read_all(int fd, void *buf, size_t bytes)
+
+static int read_all(int fd, void *buf, size_t bytes)
 {
 	size_t offset = 0;
 
@@ -182,7 +183,7 @@ int read_all(int fd, void *buf, size_t bytes)
 	return offset;
 }
 
-int write_all(int fd, const void *buf, size_t bytes)
+static int write_all(int fd, const void *buf, size_t bytes)
 {
 	size_t offset = 0;
 
@@ -242,7 +243,7 @@ done:
 	g->config.num_capsets = i;
 }
 
-size_t process_fences(struct gpu_device *g, uint32_t fence_id)
+static size_t process_fences(struct gpu_device *g, uint32_t fence_id)
 {
 	struct async_resp *r = g->async_resp;
 	struct cmd *cmd;
@@ -263,7 +264,7 @@ size_t process_fences(struct gpu_device *g, uint32_t fence_id)
 	return processed;
 }
 
-void add_resp(struct gpu_device *g, struct virtio_gpu_ctrl_hdr *hdr,
+static void add_resp(struct gpu_device *g, struct virtio_gpu_ctrl_hdr *hdr,
 	      struct vqueue_request *req)
 {
 	struct async_resp *r = g->async_resp;
@@ -278,7 +279,7 @@ void add_resp(struct gpu_device *g, struct virtio_gpu_ctrl_hdr *hdr,
 	TAILQ_INSERT_TAIL(&r->async_cmds, cmd, cmds);
 }
 
-void destroy_async_resp(struct gpu_device *g)
+static void destroy_async_resp(struct gpu_device *g)
 {
 	struct async_resp *r = g->async_resp;
 
@@ -308,7 +309,7 @@ static struct async_resp *init_async_resp(void)
  * @param b - pointer to RVGPU backend
  * @param revents - events received on poll
  */
-int wait_resource_events(struct rvgpu_backend *b, short int *revents)
+static int wait_resource_events(struct rvgpu_backend *b, short int *revents)
 {
 	short int events[b->plugin_v1.ctx.scanout_num];
 
@@ -471,7 +472,7 @@ static void *resource_thread_func(void *param)
 	return NULL;
 }
 
-struct gpu_device *gpu_device_init(int lo_fd, int efd, int capset,
+static struct gpu_device *gpu_device_init(int lo_fd, int efd, int capset,
 				   const struct gpu_device_params *params,
 				   struct rvgpu_backend *b)
 {
@@ -572,7 +573,7 @@ struct gpu_device *gpu_device_init(int lo_fd, int efd, int capset,
 	return g;
 }
 
-void gpu_device_free(struct gpu_device *g)
+static void gpu_device_free(struct gpu_device *g)
 {
 	unsigned int i;
 
@@ -594,7 +595,7 @@ void gpu_device_free(struct gpu_device *g)
 	free(g);
 }
 
-void gpu_device_config(struct gpu_device *g)
+static void gpu_device_config(struct gpu_device *g)
 {
 	struct virtio_gpu_config c;
 	struct virtio_lo_config cfg = { .idx = g->idx,
@@ -1171,7 +1172,7 @@ static void gpu_device_serve_cursor(struct gpu_device *g)
 	}
 }
 
-void gpu_device_serve(struct gpu_device *g)
+static void gpu_device_serve(struct gpu_device *g)
 {
 	uint64_t ev;
 	ssize_t ret;
