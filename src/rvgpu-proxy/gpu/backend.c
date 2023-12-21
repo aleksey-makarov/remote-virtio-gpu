@@ -5,8 +5,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include <librvgpu/rvgpu.h>
-
+#include "rvgpu.h"
 #include "backend.h"
 
 static enum reset_state gpu_reset_state;

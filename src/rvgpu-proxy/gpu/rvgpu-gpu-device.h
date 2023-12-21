@@ -30,6 +30,7 @@ struct gpu_device_params {
 	struct virtio_gpu_display_one dpys[VIRTIO_GPU_MAX_SCANOUTS];
 };
 
+struct rvgpu_backend;
 int gpu_device_main(struct gpu_device_params *param, struct rvgpu_backend *rvgpu_be);
 
 #endif /* RVGPU_GPU_DEVICE_H */

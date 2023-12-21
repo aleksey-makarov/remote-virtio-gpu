@@ -32,7 +32,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <librvgpu/rvgpu.h>
+#include "rvgpu.h"
 
 struct poll_entries {
 	struct pollfd *ses_timer;

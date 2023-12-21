@@ -27,7 +27,8 @@
 #include <unistd.h>
 
 #include <librvgpu/rvgpu-protocol.h>
-#include <librvgpu/rvgpu.h>
+
+#include "rvgpu.h"
 
 struct patch_data {
 	struct rvgpu_patch hdr;

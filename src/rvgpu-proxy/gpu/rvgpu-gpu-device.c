@@ -46,7 +46,6 @@
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
-#include <librvgpu/rvgpu.h>
 #include <librvgpu/rvgpu-protocol.h>
 
 #include <rvgpu-generic/rvgpu-capset.h>
@@ -59,6 +58,7 @@
 #include "rvgpu-gpu-device.h"
 #include "backend.h"
 #include "error.h"
+#include "rvgpu.h"
 
 #define GPU_MAX_CAPDATA 16
 

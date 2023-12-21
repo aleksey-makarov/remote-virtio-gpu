@@ -30,9 +30,9 @@
 #include <rvgpu-generic/rvgpu-sanity.h>
 #include <rvgpu-generic/rvgpu-utils.h>
 
-#include <librvgpu/rvgpu.h>
 #include <librvgpu/rvgpu-protocol.h>
 
+#include "rvgpu.h"
 #include "rvgpu-input-device.h"
 
 #define UINPUT_PATH "/dev/uinput"
