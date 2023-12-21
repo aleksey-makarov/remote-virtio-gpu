@@ -29,6 +29,18 @@
 #include <unistd.h>
 
 #include "rvgpu.h"
+#include "rvgpu_private.h"
+
+struct conn_pipes {
+	int rcv_pipe[2];
+	int snd_pipe[2];
+};
+
+struct sc_priv {
+	struct conn_pipes pipes[SOCKET_NUM];
+	struct rvgpu_scanout_arguments *args;
+	bool activated;
+};
 
 static void free_communic_pipes(struct rvgpu_scanout *scanout)
 {

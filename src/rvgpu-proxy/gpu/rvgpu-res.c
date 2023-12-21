@@ -29,6 +29,7 @@
 #include <librvgpu/rvgpu-protocol.h>
 
 #include "rvgpu.h"
+#include "rvgpu_private.h"
 
 struct patch_data {
 	struct rvgpu_patch hdr;

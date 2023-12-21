@@ -22,8 +22,6 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 
-#define MAX_HOSTS 16
-
 #define SOCKET_NUM 2
 #define TIMERS_CNT 2
 
@@ -123,57 +121,6 @@ struct rvgpu_scanout {
 struct rvgpu_backend {
 	struct rvgpu_ctx ctx;
 	struct rvgpu_scanout scanout[MAX_HOSTS];
-};
-
-struct gpu_reset {
-	enum reset_state state;
-	pthread_mutex_t lock;
-	pthread_cond_t cond;
-};
-
-struct conn_pipes {
-	int rcv_pipe[2];
-	int snd_pipe[2];
-};
-
-enum host_state {
-	HOST_NONE,
-	HOST_CONNECTED,
-	HOST_DISCONNECTED,
-	HOST_RECONNECTED,
-};
-
-struct vgpu_host {
-	struct tcp_host *tcp;
-	struct pollfd *pfd;
-	int host_p[2];
-	int vpgu_p[2];
-	int sock;
-	enum host_state state;
-};
-
-struct ctx_priv {
-	pthread_t tid;
-	uint16_t inited_scanout_num;
-	uint16_t scanout_num;
-	bool interrupted;
-	struct vgpu_host cmd[MAX_HOSTS];
-	struct vgpu_host res[MAX_HOSTS];
-	uint16_t cmd_count;
-	uint16_t res_count;
-	struct gpu_reset reset;
-	pthread_mutex_t lock;
-	struct rvgpu_scanout *sc[MAX_HOSTS];
-	struct rvgpu_ctx_arguments args;
-	void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
-			     enum reset_state state); /**< reset callback */
-	LIST_HEAD(res_head, rvgpu_res) reslist;
-};
-
-struct sc_priv {
-	struct conn_pipes pipes[SOCKET_NUM];
-	struct rvgpu_scanout_arguments *args;
-	bool activated;
 };
 
 /** @brief Init a remote virtio gpu context
