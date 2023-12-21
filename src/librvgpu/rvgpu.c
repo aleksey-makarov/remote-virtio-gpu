@@ -278,6 +278,8 @@ int rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p, int timeo,
 	return ret;
 }
 
+void *thread_conn_tcp(void *arg);
+
 int rvgpu_ctx_init(struct rvgpu_ctx *ctx, struct rvgpu_ctx_arguments args,
 		   void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
 					enum reset_state state))
