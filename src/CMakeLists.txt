@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-add_subdirectory(librvgpu)
 add_subdirectory(rvgpu-sanity)
 add_subdirectory(rvgpu-proxy)
 add_subdirectory(rvgpu-renderer)

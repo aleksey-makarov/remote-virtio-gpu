@@ -24,6 +24,9 @@ add_executable(rvgpu-proxy
 	gpu/backend.c
 	gpu/x_rvgpu-map-guest.c
 	gpu/x_rvgpu-vqueue.c
+	gpu/rvgpu.c
+	gpu/rvgpu-tcp.c
+	gpu/rvgpu-res.c
 	rvgpu-proxy.c
 	$<TARGET_OBJECTS:rvgpu-sanity>)
 target_include_directories(rvgpu-proxy PRIVATE
@@ -32,7 +35,6 @@ target_include_directories(rvgpu-proxy PRIVATE
 target_compile_definitions(rvgpu-proxy PRIVATE
 	_FILE_OFFSET_BITS=64
 	_DEFAULT_SOURCE
-	_GNU_SOURCE
-	LIBRVGPU_SOVERSION=${LIBRVGPU_SOVERSION})
+	_GNU_SOURCE)
 target_link_libraries(rvgpu-proxy PRIVATE pthread dl)
 install(TARGETS rvgpu-proxy RUNTIME DESTINATION bin)

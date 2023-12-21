@@ -52,7 +52,6 @@ stdenv.mkDerivation rec {
 
   postPatch = ''
     substituteInPlace src/rvgpu-proxy/rvgpu-proxy.h --replace /etc/virgl.capset $capset
-    substituteInPlace src/rvgpu-proxy/gpu/backend.c --replace librvgpu.so       $out/lib/librvgpu.so
   '';
 
   meta = with lib; {
