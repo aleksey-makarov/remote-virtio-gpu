@@ -58,6 +58,7 @@
 #include "rvgpu-iov.h"
 #include "rvgpu-gpu-device.h"
 #include "backend.h"
+#include "error.h"
 
 #define GPU_MAX_CAPDATA 16
 
@@ -84,29 +85,6 @@ enum { PROXY_GPU_CONFIG, PROXY_GPU_QUEUES };
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 # define VSYNC_ENABLE
-#endif
-
-#ifdef VSYNC_ENABLE
-/* Check if we are being ran on old enough kernel */
-static bool ok_to_use_vsync(void)
-{
-	struct utsname buffer;
-	unsigned int major;
-	unsigned int minor;
-	int ret;
-
-	if (uname(&buffer) != 0)
-		err(1, "uname() errror");
-
-	ret = sscanf(buffer.release, "%u.%u", &major, &minor);
-	if (ret != 2)
-		errx(1, "can not parse kernel release");
-
-	if (major == 5)
-		return minor < 15;
-
-	return major < 5;
-}
 #endif
 
 struct gpu_capdata {
@@ -159,6 +137,35 @@ struct gpu_device {
 	struct async_resp *async_resp;
 };
 
+#ifdef VSYNC_ENABLE
+/* Check if we are being ran on old enough kernel */
+static bool ok_to_use_vsync(void)
+{
+	struct utsname buffer;
+	unsigned int major;
+	unsigned int minor;
+	int ret;
+
+	if (uname(&buffer) != 0) {
+		error_errno("uname()");
+		return false;
+	}
+
+	buffer.release[_UTSNAME_RELEASE_LENGTH - 1] = 0;
+
+	ret = sscanf(buffer.release, "%u.%u", &major, &minor);
+	if (ret != 2) {
+		error("can not parse kernel release %s", buffer.release);
+		return false;
+	}
+
+	if (major == 5)
+		return minor < 15;
+
+	return major < 5;
+}
+#endif
+
 static inline uint64_t bit64(unsigned int shift)
 {
 	return ((uint64_t)1) << shift;
@@ -173,10 +180,10 @@ static int read_all(int fd, void *buf, size_t bytes)
 		if (r > 0) {
 			offset += (size_t)r;
 		} else if (r == 0) {
-			warnx("Connection was closed");
+			error("connection was closed");
 			return -1;
 		} else if (errno != EAGAIN) {
-			warn("Error while reading from socket");
+			error_errno("read()");
 			return -1;
 		}
 	}
@@ -193,7 +200,7 @@ static int write_all(int fd, const void *buf, size_t bytes)
 		if (written >= 0) {
 			offset += (size_t)written;
 		} else if (errno != EAGAIN) {
-			warn("Error while writing to socket");
+			error("write()");
 			return -1;
 		}
 	}
@@ -223,13 +230,13 @@ static void gpu_capset_init(struct gpu_device *g, int capset)
 				goto done;
 
 			if (c->hdr.size > sizeof(c->data)) {
-				warnx("too long capset");
+				error("capset is too long");
 				goto done;
 			}
 
 			if (read(capset, c->data, c->hdr.size) !=
 			    (ssize_t)c->hdr.size) {
-				warn("cannot read capset data");
+				error_errno("read(capset)");
 				goto done;
 			}
 
@@ -1198,27 +1205,37 @@ int gpu_device_main(struct gpu_device_params *params, struct rvgpu_backend *rvgp
 
 	if (params->capset_path) {
 		capset = open(params->capset_path, O_RDONLY);
-		if (capset == -1)
-			err(1, "open %s", optarg);
+		if (capset == -1) {
+			error_errno("open(%s)", params->capset_path);
+			return -1;
+		}
 	}
 
 	if (capset == -1) {
 		capset = open(CAPSET_PATH, O_RDONLY);
-		if (capset == -1)
-			err(1, "%s", CAPSET_PATH);
+		if (capset == -1) {
+			error_errno("open(%s)", CAPSET_PATH);
+			return -1;
+		}
 	}
 
 	lo_fd = open(VIRTIO_LO_PATH, O_RDWR);
-	if (lo_fd == -1)
-		err(1, "%s", VIRTIO_LO_PATH);
+	if (lo_fd == -1) {
+		error_errno("open(%s)", VIRTIO_LO_PATH);
+		goto err_close_capset;
+	}
 
 	epoll_fd = epoll_create(1);
-	if (epoll_fd == -1)
-		err(1, "epoll_create");
+	if (epoll_fd == -1) {
+		error_errno("epoll_create()");
+		goto err_close_lo;
+	}
 
 	dev = gpu_device_init(lo_fd, epoll_fd, capset, params, rvgpu_be);
-	if (!dev)
-		err(1, "gpu device init");
+	if (!dev) {
+		error("gpu_device_init()");
+		goto err_close_epoll;
+	}
 
 	/* do the main_cycle */
 	for (;;) {
@@ -1248,5 +1265,12 @@ int gpu_device_main(struct gpu_device_params *params, struct rvgpu_backend *rvgp
 	close(capset);
 
 	return 0;
-}
 
+err_close_epoll:
+	close(epoll_fd);
+err_close_lo:
+	close(lo_fd);
+err_close_capset:
+	close(capset);
+	return -1;
+}
