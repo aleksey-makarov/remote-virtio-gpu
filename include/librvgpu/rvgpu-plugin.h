@@ -23,8 +23,6 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 
-#define RVGPU_BACKEND_V1 1u
-
 /* Maximum number of remote rendering targets */
 #define MAX_HOSTS 16
 
@@ -171,7 +169,6 @@ struct rvgpu_scanout {
 
 struct rvgpu_backend {
 	void *lib_handle;
-	uint32_t plugin_version;
 	struct rvgpu_rendering_ctx_ops ops;
 	struct rvgpu_ctx ctx;
 	struct rvgpu_scanout scanout[MAX_HOSTS];

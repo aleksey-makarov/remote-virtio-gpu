@@ -31,8 +31,6 @@
 #include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu.h>
 
-const uint32_t rvgpu_backend_version = 1;
-
 static void free_communic_pipes(struct rvgpu_scanout *scanout)
 {
 	struct sc_priv *sc_priv = (struct sc_priv *)scanout->priv;

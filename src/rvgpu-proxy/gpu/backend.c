@@ -7,17 +7,6 @@
 
 #include "backend.h"
 
-#define VERSION_SYMBOL_NAME "rvgpu_backend_version"
-
-#define GPU_BE_FIND_PLUGIN_VERSION(ver)                                        \
-	do {                                                                   \
-		uint32_t *ver_ptr =                                            \
-			(uint32_t *)dlsym(plugin, VERSION_SYMBOL_NAME);        \
-		if (ver_ptr == NULL)                                           \
-			(ver) = 1u;                                            \
-		else                                                           \
-			(ver) = *ver_ptr;                                      \
-	} while (0)
 #define GPU_BE_OPS_FIELD(field) ((be)->ops.field)
 #define GPU_BE_FIND_SYMBOL_OR_FAIL(symbol)                             \
 	do {                                                           \
@@ -58,29 +47,19 @@ static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ct
 	struct rvgpu_ctx *ctx = &b->ctx;
 	struct rvgpu_backend *be = b;
 	void *plugin = b->lib_handle;
-	uint32_t version;
 
-	GPU_BE_FIND_PLUGIN_VERSION(version);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_init);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_destroy);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_frontend_reset_state);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wait);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wakeup);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_poll);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_send);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_transfer_to_host);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_create);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_find);
+	GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_destroy);
 
-	switch (version) {
-	case RVGPU_BACKEND_V1:
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_init);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_destroy);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_frontend_reset_state);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wait);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_wakeup);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_poll);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_send);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_transfer_to_host);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_create);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_find);
-		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_ctx_res_destroy);
-		break;
-	default:
-		err(1, "unsupported backend version: %u", version);
-	}
-
-	be->plugin_version = version;
 	be->ops.rvgpu_ctx_init(ctx, ctx_args, &backend_reset_state);
 
 	return 0;
@@ -93,23 +72,15 @@ static int rvgpu_init_backends(struct rvgpu_backend *b,
 {
 	struct rvgpu_ctx *ctx = &b->ctx;
 	void *plugin = b->lib_handle;
-	uint32_t version = b->plugin_version;
 
 	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
 		struct rvgpu_scanout *be = &b->scanout[i];
 
-		switch (version) {
-		case RVGPU_BACKEND_V1:
-			GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_init);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_destroy);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_send);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv);
-			GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv_all);
-			break;
-		default:
-			err(1, "unsupported backend version: %u\n", version);
-			return -1;
-		}
+		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_init);
+		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_destroy);
+		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_send);
+		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv);
+		GPU_BE_FIND_SYMBOL_OR_FAIL(rvgpu_recv_all);
 
 		be->ops.rvgpu_init(ctx, be, scanout_args[i]);
 	}
