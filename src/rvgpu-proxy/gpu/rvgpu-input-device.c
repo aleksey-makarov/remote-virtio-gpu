@@ -116,15 +116,14 @@ static int input_wait(struct input_device *inpdev)
 {
 	struct rvgpu_backend *b = inpdev->backend;
 
-	short int events[b->plugin_v1.ctx.scanout_num];
+	short int events[b->ctx.scanout_num];
 
 	memset(inpdev->revents, 0,
-	       sizeof(short int) * b->plugin_v1.ctx.scanout_num);
+	       sizeof(short int) * b->ctx.scanout_num);
 	memset(events, POLLIN,
-	       sizeof(short int) * b->plugin_v1.ctx.scanout_num);
+	       sizeof(short int) * b->ctx.scanout_num);
 
-	return b->plugin_v1.ops.rvgpu_ctx_poll(&b->plugin_v1.ctx, COMMAND, -1,
-					       events, inpdev->revents);
+	return b->ops.rvgpu_ctx_poll(&b->ctx, COMMAND, -1, events, inpdev->revents);
 }
 
 static int input_read(struct input_device *inpdev, void *buf, const size_t len,
@@ -135,11 +134,10 @@ static int input_read(struct input_device *inpdev, void *buf, const size_t len,
 
 	input_wait(inpdev);
 
-	for (int i = 0; i < b->plugin_v1.ctx.scanout_num; i++) {
+	for (int i = 0; i < b->ctx.scanout_num; i++) {
 		if (inpdev->revents[i] & POLLIN) {
-			struct rvgpu_scanout *s = &b->plugin_v1.scanout[i];
-			ssize_t ret = s->plugin_v1.ops.rvgpu_recv_all(
-				s, COMMAND, buf, len);
+			struct rvgpu_scanout *s = &b->scanout[i];
+			ssize_t ret = s->ops.rvgpu_recv_all(s, COMMAND, buf, len);
 			if (ret > 0) {
 				if (src)
 					*src = i;
