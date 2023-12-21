@@ -32,7 +32,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu.h>
 
 struct poll_entries {

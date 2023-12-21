@@ -28,7 +28,6 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-#include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>
 
 #include <rvgpu-generic/rvgpu-sanity.h>

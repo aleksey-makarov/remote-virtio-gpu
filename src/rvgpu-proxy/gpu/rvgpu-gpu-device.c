@@ -47,7 +47,6 @@
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
 
 #include <librvgpu/rvgpu.h>
-#include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>
 
 #include <rvgpu-generic/rvgpu-capset.h>

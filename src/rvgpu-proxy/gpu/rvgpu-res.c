@@ -26,7 +26,6 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-#include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu-protocol.h>
 #include <librvgpu/rvgpu.h>
 

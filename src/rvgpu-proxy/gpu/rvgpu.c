@@ -28,7 +28,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <librvgpu/rvgpu-plugin.h>
 #include <librvgpu/rvgpu.h>
 
 static void free_communic_pipes(struct rvgpu_scanout *scanout)

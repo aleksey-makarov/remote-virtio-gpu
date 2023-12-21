@@ -22,9 +22,6 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 
-#include <librvgpu/rvgpu.h>
-#include <librvgpu/rvgpu-plugin.h>
-
 #define MAX_HOSTS 16
 
 #define SOCKET_NUM 2
@@ -33,6 +30,113 @@
 #define PIPE_SIZE (8 * 1024 * 1024)
 #define PIPE_READ (0)
 #define PIPE_WRITE (1)
+
+/* Maximum number of remote rendering targets */
+#define MAX_HOSTS 16
+
+/*
+ * Header for the RVGPU commands.
+ * Imported from the remote-virtio-gpu device.
+ * Every virtio command should follow a rvgpu header.
+ * E.g <rvgpu_header><virtio_cmd_header><virtio_cmd>
+ */
+struct rvgpu_plugin_header {
+	uint32_t size; /**< Size of the command */
+	/* Variables used only in remote-virtio-gpu device */
+	uint16_t idx; /**< Source virtio descriptor idx */
+	uint16_t flags; /**< Flags (see enum rvgpu_flags) */
+};
+
+/*
+ * rvgpu establishes two connections to remote rendering backend.
+ * One is used for generic virtio command processing and the another one is
+ * used for resource transferring, if resource caching feature is enabled.
+ */
+enum pipe_type {
+	COMMAND,
+	RESOURCE,
+};
+
+/* Reset states of the GPU Resync feature */
+enum reset_state {
+	GPU_RESET_NONE,
+	GPU_RESET_TRUE,
+	GPU_RESET_INITIATED,
+};
+
+struct tcp_host {
+	char *ip;
+	char *port;
+};
+
+struct rvgpu_scanout_arguments {
+	/* TCP connection arguments */
+	struct tcp_host tcp;
+};
+
+struct rvgpu_ctx_arguments {
+	/* Timeout in seconds to wait for all scanouts be connected */
+	uint16_t conn_tmt_s;
+	/* Scanout reconnection interval */
+	uint16_t reconn_intv_ms;
+	/* Number of scanouts */
+	uint16_t scanout_num;
+};
+
+struct rvgpu_scanout;
+
+struct rvgpu_ctx {
+	uint16_t scanout_num;
+	void *priv;
+};
+
+/*
+ * RVGPU resource information
+ */
+struct rvgpu_res_info {
+	uint32_t target;
+	uint32_t format;
+	uint32_t width;
+	uint32_t height;
+	uint32_t depth;
+	uint32_t array_size;
+	uint32_t last_level;
+	uint32_t flags;
+	uint32_t bpp;
+};
+
+/*
+ * RVGPU resource
+ */
+struct rvgpu_res {
+	unsigned int resid;
+	struct iovec *backing;
+	unsigned int nbacking;
+	struct rvgpu_res_info info;
+
+	LIST_ENTRY(rvgpu_res) entry;
+};
+
+/*
+ * Unified structure to pass the 2d/3d transfer to host info
+ */
+struct rvgpu_res_transfer {
+	uint32_t x, y, z;
+	uint32_t w, h, d;
+	uint32_t level;
+	uint32_t stride;
+	uint64_t offset;
+};
+
+struct rvgpu_scanout {
+	uint32_t scanout_id;
+	void *priv;
+};
+
+struct rvgpu_backend {
+	struct rvgpu_ctx ctx;
+	struct rvgpu_scanout scanout[MAX_HOSTS];
+};
 
 struct gpu_reset {
 	enum reset_state state;

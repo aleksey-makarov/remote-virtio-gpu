@@ -18,7 +18,7 @@
 #ifndef __backend_h__
 #define __backend_h__
 
-#include <librvgpu/rvgpu-plugin.h>
+#include <librvgpu/rvgpu.h>
 
 struct host_server {
 	char *hostname;
