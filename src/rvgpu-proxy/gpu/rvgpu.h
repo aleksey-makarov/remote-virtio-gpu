@@ -35,19 +35,6 @@
 #define MAX_HOSTS 16
 
 /*
- * Header for the RVGPU commands.
- * Imported from the remote-virtio-gpu device.
- * Every virtio command should follow a rvgpu header.
- * E.g <rvgpu_header><virtio_cmd_header><virtio_cmd>
- */
-struct rvgpu_plugin_header {
-	uint32_t size; /**< Size of the command */
-	/* Variables used only in remote-virtio-gpu device */
-	uint16_t idx; /**< Source virtio descriptor idx */
-	uint16_t flags; /**< Flags (see enum rvgpu_flags) */
-};
-
-/*
  * rvgpu establishes two connections to remote rendering backend.
  * One is used for generic virtio command processing and the another one is
  * used for resource transferring, if resource caching feature is enabled.
