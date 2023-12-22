@@ -96,11 +96,13 @@ int main(int argc, char **argv)
 			    .enabled = 1 } },
 	};
 
-	struct host_conn servers = {
-		.host_cnt = 0,
+	struct rvgpu_ctx_arguments ctx_args = {
 		.conn_tmt_s = RVGPU_DEFAULT_CONN_TMT_S,
 		.reconn_intv_ms = RVGPU_RECONN_INVL_MS,
+		.scanout_num = 0,
 	};
+
+	struct rvgpu_scanout_arguments sc_args[MAX_HOSTS];
 
 	char path[64];
 	FILE *oomFile;
@@ -189,17 +191,17 @@ int main(int argc, char **argv)
 			if (port == NULL)
 				port = RVGPU_DEFAULT_PORT;
 
-			if (servers.host_cnt == MAX_HOSTS) {
+			if (ctx_args.scanout_num == MAX_HOSTS) {
 				errx(1, "Only upto %d hosts are supported.",
 				     MAX_HOSTS);
 			}
 
-			servers.hosts[servers.host_cnt].hostname = ip;
-			servers.hosts[servers.host_cnt].portnum = port;
-			servers.host_cnt++;
+			sc_args[ctx_args.scanout_num].ip = ip;
+			sc_args[ctx_args.scanout_num].port = port;
+			ctx_args.scanout_num++;
 			break;
 		case 'R':
-			servers.conn_tmt_s = (unsigned int)sanity_strtonum(
+			ctx_args.conn_tmt_s = (unsigned int)sanity_strtonum(
 				optarg, RVGPU_MIN_CONN_TMT_S,
 				RVGPU_MAX_CONN_TMT_S, &errstr);
 			if (errstr != NULL) {
@@ -219,10 +221,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (servers.host_cnt == 0) {
-		servers.hosts[0].hostname = RVGPU_DEFAULT_HOSTNAME;
-		servers.hosts[0].portnum = RVGPU_DEFAULT_PORT;
-		servers.host_cnt = 1;
+	if (ctx_args.scanout_num == 0) {
+		sc_args[0].ip = RVGPU_DEFAULT_HOSTNAME;
+		sc_args[0].port = RVGPU_DEFAULT_PORT;
+		ctx_args.scanout_num = 1;
 	}
 
 	if (params.num_scanouts == 0)
@@ -237,7 +239,7 @@ int main(int argc, char **argv)
 		fclose(oomFile);
 	}
 
-	rvgpu_be = init_backend_rvgpu(&servers);
+	rvgpu_be = init_backend_rvgpu(&ctx_args, sc_args);
 	assert(rvgpu_be);
 
 	inpdev = input_device_init(rvgpu_be);

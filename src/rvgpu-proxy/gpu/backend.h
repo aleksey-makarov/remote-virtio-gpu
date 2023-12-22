@@ -20,34 +20,9 @@
 
 #include "rvgpu.h"
 
-struct host_server {
-	char *hostname;
-	char *portnum;
-};
+struct rvgpu_backend *init_backend_rvgpu(struct rvgpu_ctx_arguments *ctx_args,
+					 struct rvgpu_scanout_arguments *hosts);
 
-struct host_conn {
-	struct host_server hosts[MAX_HOSTS];
-	unsigned int host_cnt;
-	unsigned int conn_tmt_s;
-	unsigned int reconn_intv_ms;
-};
-
-/**
- * @brief Initialize rvgpu backend
- *
- * @param servers - pointer to remote targets settings
- *
- * @return pointer to rvgpu backend
- */
-struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers);
-
-/**
- * @brief Destroy rvgpu backend
- *
- * @param b - pointer to rvgpu backend
- *
- * @return void
- */
 void destroy_backend_rvgpu(struct rvgpu_backend *b);
 
 #endif /* RVGPU_PROXY_H */

@@ -156,14 +156,14 @@ int rvgpu_ctx_transfer_to_host(struct rvgpu_ctx *ctx,
 struct rvgpu_res *rvgpu_ctx_res_find(struct rvgpu_ctx *ctx,
 				     uint32_t resource_id)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 
 	return gpu_device_get_res(ctx_priv, resource_id);
 }
 
 void rvgpu_ctx_res_destroy(struct rvgpu_ctx *ctx, uint32_t resource_id)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 	struct rvgpu_res *res;
 
 	res = gpu_device_get_res(ctx_priv, resource_id);
@@ -181,7 +181,7 @@ int rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
 			 const struct rvgpu_res_info *info,
 			 uint32_t resource_id)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 	struct rvgpu_res *res;
 
 	res = calloc(1, sizeof(*res));

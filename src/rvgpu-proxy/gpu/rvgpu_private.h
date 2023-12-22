@@ -15,7 +15,7 @@ enum host_state {
 };
 
 struct vgpu_host {
-	struct tcp_host *tcp;
+	struct rvgpu_scanout_arguments *tcp;
 	struct pollfd *pfd;
 	int host_p[2];
 	int vpgu_p[2];

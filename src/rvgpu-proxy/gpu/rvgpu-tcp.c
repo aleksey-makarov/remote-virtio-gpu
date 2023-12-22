@@ -346,7 +346,7 @@ static void disconnect(struct vgpu_host *vhost[], unsigned int cmd_cnt,
 static void handle_reset(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 		  unsigned int host_count)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 
 	rvgpu_ctx_wait_(ctx_priv, GPU_RESET_INITIATED);
 
@@ -386,7 +386,7 @@ static bool sessions_hung(struct ctx_priv *ctx, struct vgpu_host *vhost[],
 static bool sessions_reconnect(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 			int reconn_fd, unsigned int count)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 	bool reconnected = true;
 
 	for (unsigned int i = 0; i < count; i++) {
@@ -493,7 +493,7 @@ static unsigned int set_pfd(struct ctx_priv *ctx, struct vgpu_host *vhost[],
 static void in_out_events(struct rvgpu_ctx *ctx, struct poll_entries *p_entry,
 		   int cmd_count, int res_count)
 {
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+	struct ctx_priv *ctx_priv = ctx->priv;
 
 	/* Handle Virtio-GPU commands */
 	for (int i = 0; i < cmd_count; i++) {
@@ -548,9 +548,13 @@ static void in_out_events(struct rvgpu_ctx *ctx, struct poll_entries *p_entry,
 
 void *thread_conn_tcp(void *arg)
 {
+	assert(arg);
 	struct rvgpu_ctx *ctx = (struct rvgpu_ctx *)arg;
+
+	assert(ctx->priv);
 	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
 	struct rvgpu_ctx_arguments *conn_args = &ctx_priv->args;
+
 	struct vgpu_host *vhost[MAX_HOSTS];
 	struct pollfd pfd[MAX_HOSTS * SOCKET_NUM + TIMERS_CNT];
 	struct poll_entries p_entry;

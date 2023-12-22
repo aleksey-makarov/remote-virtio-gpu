@@ -49,14 +49,9 @@ enum reset_state {
 	GPU_RESET_INITIATED,
 };
 
-struct tcp_host {
+struct rvgpu_scanout_arguments {
 	char *ip;
 	char *port;
-};
-
-struct rvgpu_scanout_arguments {
-	/* TCP connection arguments */
-	struct tcp_host tcp;
 };
 
 struct rvgpu_ctx_arguments {
@@ -70,9 +65,10 @@ struct rvgpu_ctx_arguments {
 
 struct rvgpu_scanout;
 
+struct ctx_priv;
 struct rvgpu_ctx {
 	uint16_t scanout_num;
-	void *priv;
+	struct ctx_priv *priv;
 };
 
 /*
@@ -113,9 +109,10 @@ struct rvgpu_res_transfer {
 	uint64_t offset;
 };
 
+struct sc_priv;
 struct rvgpu_scanout {
 	uint32_t scanout_id;
-	void *priv;
+	struct sc_priv *priv;
 };
 
 struct rvgpu_backend {
@@ -133,7 +130,7 @@ struct rvgpu_backend {
  *         -1 on error
  */
 int rvgpu_ctx_init(struct rvgpu_ctx *ctx,
-		   struct rvgpu_ctx_arguments args);
+		   struct rvgpu_ctx_arguments *args);
 
 /** @brief Destroy a remote virtio gpu context
  *
@@ -250,7 +247,7 @@ enum reset_state rvgpu_ctx_get_reset_state(struct rvgpu_ctx *ctx);
  */
 int rvgpu_init(struct rvgpu_ctx *ctx,
 	       struct rvgpu_scanout *scanout,
-	       struct rvgpu_scanout_arguments args);
+	       struct rvgpu_scanout_arguments *args);
 
 /** @brief Destroy a remote target
  *
