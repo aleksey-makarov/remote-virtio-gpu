@@ -234,11 +234,18 @@ void rvgpu_destroy(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout)
 	}
 }
 
-void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state)
+void rvgpu_ctx_set_reset_state_initiated(struct rvgpu_ctx *ctx)
 {
 	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
 
-	ctx_priv->reset.state = state;
+	ctx_priv->reset.state = GPU_RESET_INITIATED;
+}
+
+enum reset_state rvgpu_ctx_get_reset_state(struct rvgpu_ctx *ctx)
+{
+	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
+
+	return ctx_priv->reset.state;
 }
 
 int rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p, int timeo,
@@ -291,9 +298,8 @@ int rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p, int timeo,
 
 void *thread_conn_tcp(void *arg);
 
-int rvgpu_ctx_init(struct rvgpu_ctx *ctx, struct rvgpu_ctx_arguments args,
-		   void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
-					enum reset_state state))
+int rvgpu_ctx_init(struct rvgpu_ctx *ctx,
+		   struct rvgpu_ctx_arguments args)
 {
 	struct ctx_priv *ctx_priv =
 		(struct ctx_priv *)calloc(1, sizeof(*ctx_priv));
@@ -318,7 +324,6 @@ int rvgpu_ctx_init(struct rvgpu_ctx *ctx, struct rvgpu_ctx_arguments args,
 	ctx->priv = ctx_priv;
 	ctx->scanout_num = args.scanout_num;
 	ctx_priv->scanout_num = args.scanout_num;
-	ctx_priv->gpu_reset_cb = gpu_reset_cb;
 	memcpy(&ctx_priv->args, &args, sizeof(args));
 
 	if (pthread_create(&ctx_priv->tid, NULL, thread_conn_tcp, ctx)) {

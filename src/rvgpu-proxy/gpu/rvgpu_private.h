@@ -42,8 +42,6 @@ struct ctx_priv {
 	pthread_mutex_t lock;
 	struct rvgpu_scanout *sc[MAX_HOSTS];
 	struct rvgpu_ctx_arguments args;
-	void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
-			     enum reset_state state); /**< reset callback */
 	LIST_HEAD(res_head, rvgpu_res) reslist;
 };
 

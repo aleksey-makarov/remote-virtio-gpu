@@ -51,7 +51,4 @@ struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers);
  */
 void destroy_backend_rvgpu(struct rvgpu_backend *b);
 
-enum reset_state backend_get_reset_state(void);
-void backend_set_reset_state_initiated(void);
-
 #endif /* RVGPU_PROXY_H */

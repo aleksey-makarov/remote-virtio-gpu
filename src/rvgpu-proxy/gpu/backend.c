@@ -8,29 +8,11 @@
 #include "rvgpu.h"
 #include "backend.h"
 
-static enum reset_state gpu_reset_state;
-
-static void backend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state)
-{
-	(void)ctx;
-	gpu_reset_state = state;
-}
-
-enum reset_state  backend_get_reset_state(void)
-{
-	return gpu_reset_state;
-}
-
-void backend_set_reset_state_initiated(void)
-{
-	gpu_reset_state = GPU_RESET_INITIATED;
-}
-
 static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ctx_args)
 {
 	struct rvgpu_ctx *ctx = &b->ctx;
 
-	rvgpu_ctx_init(ctx, ctx_args, &backend_reset_state);
+	rvgpu_ctx_init(ctx, ctx_args);
 
 	return 0;
 }

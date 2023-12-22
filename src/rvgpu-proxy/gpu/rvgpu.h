@@ -123,8 +123,6 @@ struct rvgpu_backend {
 	struct rvgpu_scanout scanout[MAX_HOSTS];
 };
 
-typedef void (*gpu_reset_cb_t)(struct rvgpu_ctx *ctx, enum reset_state state);
-
 /** @brief Init a remote virtio gpu context
  *
  *  @param ctx pointer to the rvgpu context
@@ -135,8 +133,7 @@ typedef void (*gpu_reset_cb_t)(struct rvgpu_ctx *ctx, enum reset_state state);
  *         -1 on error
  */
 int rvgpu_ctx_init(struct rvgpu_ctx *ctx,
-		   struct rvgpu_ctx_arguments args,
-		   gpu_reset_cb_t gpu_reset_cb);
+		   struct rvgpu_ctx_arguments args);
 
 /** @brief Destroy a remote virtio gpu context
  *
@@ -239,15 +236,8 @@ int rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
 			 const struct rvgpu_res_info *info,
 			 uint32_t resource_id);
 
-/** @brief Process the GPU reset state
- *
- *  @param ctx pointer to the rvgpu context
- *  @param state GPU reset state
- *
- *  @return void
- */
-void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx,
-				    enum reset_state state);
+void rvgpu_ctx_set_reset_state_initiated(struct rvgpu_ctx *ctx);
+enum reset_state rvgpu_ctx_get_reset_state(struct rvgpu_ctx *ctx);
 
 /** @brief Initialize a remote target
  *

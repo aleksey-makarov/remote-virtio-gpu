@@ -343,14 +343,6 @@ static void disconnect(struct vgpu_host *vhost[], unsigned int cmd_cnt,
 	}
 }
 
-static void process_reset_backend(struct rvgpu_ctx *ctx, enum reset_state state)
-{
-	struct ctx_priv *ctx_priv = (struct ctx_priv *)ctx->priv;
-
-	if (ctx_priv->gpu_reset_cb)
-		ctx_priv->gpu_reset_cb(ctx, state);
-}
-
 static void handle_reset(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 		  unsigned int host_count)
 {
@@ -361,8 +353,6 @@ static void handle_reset(struct rvgpu_ctx *ctx, struct vgpu_host *vhost[],
 	reconnect_all(vhost, host_count);
 
 	ctx_priv->reset.state = GPU_RESET_NONE;
-	if (ctx_priv->gpu_reset_cb)
-		ctx_priv->gpu_reset_cb(ctx, GPU_RESET_NONE);
 	/*
 	 * FIXME: Without this delay, rvgpu-proxy will not
 	 * wait for subscriber creation in rvgpu-renderer. This
@@ -594,7 +584,7 @@ void *thread_conn_tcp(void *arg)
 		if (p_entry.ses_timer->revents == POLLIN) {
 			if (sessions_hung(ctx_priv, vhost, &act_ses,
 					  host_count)) {
-				process_reset_backend(ctx, GPU_RESET_TRUE);
+				ctx_priv->reset.state = GPU_RESET_TRUE;
 				set_timer(p_entry.recon_timer->fd,
 					  conn_args->reconn_intv_ms);
 			}

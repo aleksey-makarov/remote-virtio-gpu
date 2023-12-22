@@ -1085,7 +1085,7 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 				break;
 			}
 		}
-		if (backend_get_reset_state()) {
+		if (rvgpu_ctx_get_reset_state(&b->ctx)) {
 			resp.hdr.type = VIRTIO_GPU_RESP_ERR_DEVICE_RESET;
 			reset = true;
 		}
@@ -1108,14 +1108,12 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 	if (reset) {
 		struct rvgpu_ctx *ctx = &b->ctx;
 
-		if (backend_get_reset_state() == GPU_RESET_NONE) {
+		if (rvgpu_ctx_get_reset_state(ctx) == GPU_RESET_NONE) {
 			reset = false;
 			rvgpu_ctx_wait(ctx, GPU_RESET_NONE);
 
-		} else if (backend_get_reset_state() == GPU_RESET_TRUE) {
-			rvgpu_ctx_frontend_reset_state(
-				ctx, GPU_RESET_INITIATED);
-			backend_set_reset_state_initiated();
+		} else if (rvgpu_ctx_get_reset_state(ctx) == GPU_RESET_TRUE) {
+			rvgpu_ctx_set_reset_state_initiated(ctx);
 			rvgpu_ctx_wakeup(ctx);
 		}
 	}
