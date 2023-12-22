@@ -20,16 +20,21 @@
 
 #include <stdio.h>
 
-#ifndef SRC_FILE
-# define SRC_FILE __FILE__
+#define error(_format, ...) ({                       \
+	fprintf(stderr, "* %s():%d : " _format "\n", \
+		__func__, __LINE__, ##__VA_ARGS__); })
+
+#define error_errno(_format, ...) ({                    \
+	fprintf(stderr, "* %s():%d %m : " _format "\n", \
+		__func__, __LINE__, ##__VA_ARGS__); })
+
+#ifdef NDEBUG
+static inline void trace(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+static inline void trace(const char *format, ...) { (void)format; };
+#else
+# define trace(_format, ...) ({                      \
+	fprintf(stderr, "- %s():%d : " _format "\n", \
+		__func__, __LINE__, ##__VA_ARGS__); })
 #endif
-
-#define error(_format, ...) ({                            \
-	fprintf(stdout, "*** %s:%d %s() : " _format "\n", \
-		SRC_FILE, __LINE__, __func__, ##__VA_ARGS__); })
-
-#define error_errno(_format, ...) ({                         \
-	fprintf(stdout, "*** %s:%d %s() %m : " _format "\n", \
-		SRC_FILE, __LINE__, __func__, ##__VA_ARGS__); })
 
 #endif /* TRACE_H */
