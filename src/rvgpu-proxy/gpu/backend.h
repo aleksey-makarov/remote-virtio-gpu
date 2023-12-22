@@ -30,7 +30,6 @@ struct host_conn {
 	unsigned int host_cnt;
 	unsigned int conn_tmt_s;
 	unsigned int reconn_intv_ms;
-	bool active;
 };
 
 /**

@@ -100,7 +100,6 @@ int main(int argc, char **argv)
 		.host_cnt = 0,
 		.conn_tmt_s = RVGPU_DEFAULT_CONN_TMT_S,
 		.reconn_intv_ms = RVGPU_RECONN_INVL_MS,
-		.active = true,
 	};
 
 	char path[64];
