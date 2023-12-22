@@ -7,40 +7,22 @@
 
 #include "rvgpu.h"
 #include "backend.h"
-
-static int rvgpu_init_ctx(struct rvgpu_backend *b, struct rvgpu_ctx_arguments ctx_args)
-{
-	struct rvgpu_ctx *ctx = &b->ctx;
-
-	rvgpu_ctx_init(ctx, ctx_args);
-
-	return 0;
-}
-
-static int rvgpu_init_backends(struct rvgpu_backend *b,
-			       struct rvgpu_scanout_arguments *scanout_args)
-{
-	struct rvgpu_ctx *ctx = &b->ctx;
-
-	for (unsigned int i = 0; i < ctx->scanout_num; i++) {
-		struct rvgpu_scanout *be = &b->scanout[i];
-
-		rvgpu_init(ctx, be, scanout_args[i]);
-	}
-
-	return 0;
-}
+#include "error.h"
 
 struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
 {
 	struct rvgpu_scanout_arguments scanout_args[MAX_HOSTS] = { 0 };
-	struct rvgpu_backend *rvgpu_be;
+	struct rvgpu_backend *b;
+	unsigned int i, j;
+	int err;
 
-	rvgpu_be = calloc(1, sizeof(*rvgpu_be));
-	if (rvgpu_be == NULL) {
-		warnx("failed to allocate backend: %s", strerror(errno));
-		goto err;
+	b = calloc(1, sizeof(*b));
+	if (b == NULL) {
+		error("calloc()");
+		return NULL;
 	}
+
+	struct rvgpu_ctx *ctx = &b->ctx;
 
 	struct rvgpu_ctx_arguments ctx_args = {
 		.conn_tmt_s = servers->conn_tmt_s,
@@ -48,26 +30,37 @@ struct rvgpu_backend *init_backend_rvgpu(struct host_conn *servers)
 		.scanout_num = servers->host_cnt,
 	};
 
-	if (rvgpu_init_ctx(rvgpu_be, ctx_args)) {
-		warnx("failed to init rvgpu ctx");
+	err = rvgpu_ctx_init(ctx, ctx_args);
+	if (err < 0) {
+		error("rvgpu_init_ctx()");
 		goto err_free;
 	}
 
-	for (unsigned int i = 0; i < servers->host_cnt; i++) {
+	for (i = 0; i < servers->host_cnt; i++) {
 		scanout_args[i].tcp.ip = strdup(servers->hosts[i].hostname);
 		scanout_args[i].tcp.port = strdup(servers->hosts[i].portnum);
 	}
 
-	if (rvgpu_init_backends(rvgpu_be, scanout_args)) {
-		warnx("failed to init rvgpu backends");
-		goto err_free;
+	for (i = 0; i < ctx->scanout_num; i++) {
+		struct rvgpu_scanout *be = &b->scanout[i];
+
+		err = rvgpu_init(ctx, be, scanout_args[i]);
+		if (err) {
+			error("rvgpu_init(%u)", i);
+			goto err_rvgpu_destroy;
+		}
+
 	}
 
-	return rvgpu_be;
+	return b;
 
+err_rvgpu_destroy:
+	for (j = 0; j < i; j++) {
+		struct rvgpu_scanout *s = &b->scanout[j];
+		rvgpu_destroy(ctx, s);
+	}
 err_free:
-	free(rvgpu_be);
-err:
+	free(b);
 	return NULL;
 }
 
