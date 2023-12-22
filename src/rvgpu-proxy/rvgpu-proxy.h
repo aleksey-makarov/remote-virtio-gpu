@@ -18,6 +18,17 @@
 #ifndef RVGPU_PROXY_H
 #define RVGPU_PROXY_H
 
+#include <linux/version.h>
+
 #define CAPSET_PATH "/etc/virgl.capset"
+
+/*
+ * The commit 34268c9dde4 from linux kernel changes virtio_gpu_ctrl_hdr
+ * that is used by UHMI to implement vsync.
+ * Check if we are compiled with old enough kernel.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+# define VSYNC_ENABLE
+#endif
 
 #endif

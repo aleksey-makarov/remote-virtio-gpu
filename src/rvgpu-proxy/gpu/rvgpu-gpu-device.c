@@ -41,7 +41,6 @@
 #include <linux/virtio_gpu.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_lo.h>
-#include <linux/version.h>
 
 #include <rvgpu-proxy/gpu/x_rvgpu-map-guest.h>
 #include <rvgpu-proxy/gpu/x_rvgpu-vqueue.h>
@@ -77,15 +76,6 @@
 enum { PROXY_GPU_CONFIG, PROXY_GPU_QUEUES };
 
 #define VIRTIO_LO_PATH "/dev/virtio-lo"
-
-/*
- * The commit 34268c9dde4 from linux kernel changes virtio_gpu_ctrl_hdr
- * that is used by UHMI to implement vsync.
- * Check if we are compiled with old enough kernel.
- */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
-# define VSYNC_ENABLE
-#endif
 
 struct gpu_capdata {
 	struct capset hdr;

@@ -37,6 +37,7 @@
 #include "gpu/backend.h"
 #include "gpu/rvgpu-gpu-device.h"
 #include "gpu/rvgpu-input-device.h"
+#include "gpu/error.h"
 
 #define DEFAULT_WIDTH 800u
 #define DEFAULT_HEIGHT 600u
@@ -63,17 +64,24 @@
 
 static void usage(void)
 {
-	static const char program_name[] = "rvgpu-proxy";
-
-	info("Usage: %s [options]\n", program_name);
-	info("\t-c capset\tspecify capset file (default: %s)\n", CAPSET_PATH);
-	info("\t-s scanout\tspecify scanout in form WxH@X,Y (default: %ux%u@0,0)\n",
-	     DEFAULT_WIDTH, DEFAULT_HEIGHT);
-	info("\t-f rate\t\tspecify virtual framerate (default: disabled)\n");
-	info("\t-i index\tspecify index 'n' for device /dev/dri/card<n>\n");
-	info("\t-n\t\tserver:port for connecting (max 4 hosts, default: %s:%s)\n",
-	     RVGPU_DEFAULT_HOSTNAME, RVGPU_DEFAULT_PORT);
-	info("\t-h\t\tshow this message\n");
+	fprintf(stderr,
+	       "Usage: rvgpu-proxy [options]\n"
+	       "	-c capset	specify capset file (default: %s)\n"
+	       "	-s scanout	specify scanout in form WxH@X,Y (default: %ux%u@0,0)\n"
+#ifdef VSYNC_ENABLE
+	       "	-f rate		specify virtual framerate (default: disabled)\n"
+#endif
+	       "	-i index	specify index 'n' for device /dev/dri/card<n>\n"
+	       "	-n		server:port for connecting (max 4 hosts, default: %s:%s)\n"
+	       "	-h		show this message\n"
+	       "\n"
+	       "compiled with linux headers version %d.%d.%d (%d)\n",
+	       CAPSET_PATH, DEFAULT_WIDTH, DEFAULT_HEIGHT,
+	       RVGPU_DEFAULT_HOSTNAME, RVGPU_DEFAULT_PORT,
+	       (LINUX_VERSION_CODE >> 16) & 0xff,
+	       (LINUX_VERSION_CODE >>  8) & 0xff,
+	       (LINUX_VERSION_CODE >>  0) & 0xff,
+	        LINUX_VERSION_CODE);
 }
 
 int main(int argc, char **argv)
@@ -147,6 +155,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'f':
+#ifdef VSYNC_ENABLE
 			params.framerate = (unsigned long)sanity_strtonum(
 				optarg, FRAMERATE_MIN, FRAMERATE_MAX, &errstr);
 			if (errstr != NULL) {
@@ -155,6 +164,10 @@ int main(int argc, char **argv)
 				errx(1, "Invalid framerate %s:%s", optarg,
 				     errstr);
 			}
+#else
+			error("VSYNC is not supported");
+			exit(EXIT_FAILURE);
+#endif
 			break;
 		case 's':
 			if (params.num_scanouts >= VIRTIO_GPU_MAX_SCANOUTS) {
@@ -253,5 +266,5 @@ int main(int argc, char **argv)
 	input_device_free(inpdev);
 	destroy_backend_rvgpu(rvgpu_be);
 
-	return EXIT_SUCCESS;
+	exit(EXIT_SUCCESS);
 }
