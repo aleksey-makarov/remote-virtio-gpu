@@ -123,19 +123,20 @@ struct rvgpu_backend {
 	struct rvgpu_scanout scanout[MAX_HOSTS];
 };
 
+typedef void (*gpu_reset_cb_t)(struct rvgpu_ctx *ctx, enum reset_state state);
+
 /** @brief Init a remote virtio gpu context
  *
  *  @param ctx pointer to the rvgpu context
- *  @param state GPU reset state
  *  @param args arguments needed to initialize a remote virtio gpu context
  *  @param gpu_reset_cb callback function to process the GPU reset state
  *
  *  @return 0 on success
  *         -1 on error
  */
-int rvgpu_ctx_init(struct rvgpu_ctx *ctx, struct rvgpu_ctx_arguments args,
-		   void (*gpu_reset_cb)(struct rvgpu_ctx *ctx,
-					enum reset_state state));
+int rvgpu_ctx_init(struct rvgpu_ctx *ctx,
+		   struct rvgpu_ctx_arguments args,
+		   gpu_reset_cb_t gpu_reset_cb);
 
 /** @brief Destroy a remote virtio gpu context
  *
@@ -152,12 +153,12 @@ void rvgpu_ctx_destroy(struct rvgpu_ctx *ctx);
  *
  *  @return void
  */
-void rvgpu_ctx_wait(struct rvgpu_ctx *ctx, enum reset_state state);
+void rvgpu_ctx_wait(struct rvgpu_ctx *ctx,
+		    enum reset_state state);
 
 /** @brief Wakeup a ctx from rvgpu_ctx_wait function
  *
  *  @param ctx pointer to the rvgpu context
- *  @param state GPU reset state
  *
  *  @return void
  */
@@ -173,8 +174,11 @@ void rvgpu_ctx_wakeup(struct rvgpu_ctx *ctx);
  *
  *  @return number of poll revents
  */
-int rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p, int timeo,
-		   short int *events, short int *revents);
+int rvgpu_ctx_poll(struct rvgpu_ctx *ctx,
+		   enum pipe_type p,
+		   int timeo,
+		   short int *events,
+		   short int *revents);
 
 /** @brief Transfer the virtio stream to remote targets
  *
@@ -185,7 +189,9 @@ int rvgpu_ctx_poll(struct rvgpu_ctx *ctx, enum pipe_type p, int timeo,
  *  @return 0 on success
  *  @return errno on error
  */
-int rvgpu_ctx_send(struct rvgpu_ctx *ctx, const void *buf, size_t len);
+int rvgpu_ctx_send(struct rvgpu_ctx *ctx,
+                   const void *buf,
+		   size_t len);
 
 /** @brief transfer a remote virtio gpu resource to target
  *
@@ -217,7 +223,8 @@ struct rvgpu_res *rvgpu_ctx_res_find(struct rvgpu_ctx *ctx,
  *
  *  @return void
  */
-void rvgpu_ctx_res_destroy(struct rvgpu_ctx *ctx, uint32_t resource_id);
+void rvgpu_ctx_res_destroy(struct rvgpu_ctx *ctx,
+			   uint32_t resource_id);
 
 /** @brief Create a remote virtio gpu resource
  *
@@ -232,6 +239,16 @@ int rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
 			 const struct rvgpu_res_info *info,
 			 uint32_t resource_id);
 
+/** @brief Process the GPU reset state
+ *
+ *  @param ctx pointer to the rvgpu context
+ *  @param state GPU reset state
+ *
+ *  @return void
+ */
+void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx,
+				    enum reset_state state);
+
 /** @brief Initialize a remote target
  *
  *  @param ctx pointer to the rvgpu context
@@ -241,7 +258,8 @@ int rvgpu_ctx_res_create(struct rvgpu_ctx *ctx,
  *  @return 0 on success
  *  @return -1 on error
  */
-int rvgpu_init(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout,
+int rvgpu_init(struct rvgpu_ctx *ctx,
+	       struct rvgpu_scanout *scanout,
 	       struct rvgpu_scanout_arguments args);
 
 /** @brief Destroy a remote target
@@ -251,7 +269,8 @@ int rvgpu_init(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout,
  *
  *  @return void
  */
-void rvgpu_destroy(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout);
+void rvgpu_destroy(struct rvgpu_ctx *ctx,
+		   struct rvgpu_scanout *scanout);
 
 /** @brief Receive data of the specified length from a remote target
  *
@@ -263,7 +282,9 @@ void rvgpu_destroy(struct rvgpu_ctx *ctx, struct rvgpu_scanout *scanout);
  *  @return size of received data
  *  @return errno on error
  */
-int rvgpu_recv_all(struct rvgpu_scanout *scanout, enum pipe_type p, void *buf,
+int rvgpu_recv_all(struct rvgpu_scanout *scanout,
+		   enum pipe_type p,
+		   void *buf,
 		   size_t len);
 
 /** @brief Receive data from a remote target
@@ -276,7 +297,9 @@ int rvgpu_recv_all(struct rvgpu_scanout *scanout, enum pipe_type p, void *buf,
  *  @return size of received data
  *  @return errno on error
  */
-int rvgpu_recv(struct rvgpu_scanout *scanout, enum pipe_type p, void *buf,
+int rvgpu_recv(struct rvgpu_scanout *scanout,
+	       enum pipe_type p,
+	       void *buf,
 	       size_t len);
 
 /** @brief Send data to a remote target
@@ -289,16 +312,9 @@ int rvgpu_recv(struct rvgpu_scanout *scanout, enum pipe_type p, void *buf,
  *  @return size of sent data
  *  @return errno on error
  */
-int rvgpu_send(struct rvgpu_scanout *scanout, enum pipe_type p, const void *buf,
+int rvgpu_send(struct rvgpu_scanout *scanout,
+	       enum pipe_type p,
+	       const void *buf,
 	       size_t len);
-
-/** @brief Process the GPU reset state
- *
- *  @param ctx pointer to the rvgpu context
- *  @param state GPU reset state
- *
- *  @return void
- */
-void rvgpu_ctx_frontend_reset_state(struct rvgpu_ctx *ctx, enum reset_state state);
 
 #endif /* RVGPU_H */
