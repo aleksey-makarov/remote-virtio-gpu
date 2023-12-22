@@ -126,7 +126,7 @@
       trap 'on_exit' EXIT
 
       echo "starting weston"
-      ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.weston}/bin/weston --width 2200 --height 1200 -S "${wayland_socket_name}" &
+      ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.weston}/bin/weston --width 1920 --height 1080 -S "${wayland_socket_name}" &
 
       echo "sleep"
       sleep 1
@@ -135,12 +135,12 @@
       export WAYLAND_DISPLAY="${wayland_socket_name}"
 
       # One fullscreen
-      ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b ${builtins.toString renderer_w}x${builtins.toString renderer_h}@0,0 -p 55667
+      # ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b ${builtins.toString renderer_w}x${builtins.toString renderer_h}@0,0 -p 55667
 
-      # # Two half-scrren
-      # ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b 960x1080@0,0   -p 55667 &
-      # RENDERER_PID=$!
-      # ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b 960x1080@960,0 -p 55668
+      # Two half-scrren
+      ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b 640x800@0,0   -p 55667 &
+      RENDERER_PID=$!
+      ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.remote-virtio-gpu}/bin/rvgpu-renderer -b 640x800@640,0 -p 55668
     '';
   in {
     packages.${system} = rec {

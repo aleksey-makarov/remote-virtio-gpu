@@ -27,7 +27,6 @@ Clone the Remote GPU repo from GitHub, enter to the created directory and run `n
 
     git clone https://github.com/aleksey-makarov/remote-virtio-gpu.git
     cd remote-virtio-gpu
-    git checkout -b for_merge_03 origin/for_merge_03
     nix develop
 
 The last command will download the most of the required software from the `Nix` caches,
@@ -37,18 +36,32 @@ software is ready to use.
 
 ### How to run QEMU inside the development environment
 
-Among others, there is `startvm.sh` script in the `PATH` of that environment.
-Start it.  It creates a `QEMU` disk `nixos.qcow2` with all the required software
+Among others, there is `startvm.sh` script in the `PATH` of development environment.
+Start it.  Alternatively, this script can be run without entering the development
+environment with this `nix` command:
+
+    nix run
+
+It creates a `QEMU` disk `nixos.qcow2` with all the required software
 and starts `QEMU` with that disk.  It creates a serial shell sessioin to the
 machine in the termial.  You will be authomatically logged in as `root`.
 Also it creates `xchg` directory that is mounted inside `QEMU` as `/tmp/xchg`.
+
 You can run
 
     . /tmp/xchg/tty.sh
 
 to fix terminal settings inside of the serial terminal of the `QEMU`.
+
+
+You can log in to the guest system with `ssh`:
+
+    ssh -p 10022 root@localhost
+
 All the following commands should be issued inside that `QEMU` serial shell
 session.
+
+## Test DRM backend
 
 ### Start remote VIRTIO GPU
 
@@ -117,12 +130,28 @@ All the following commands could be run in a new terminal in Weston or in the
 
     glmark-es2-wayland
 
-### Restrictions
+## Test Wayland backend
+
+- Run `nix` command that starts wayland window and two renderers with output to that window:
+
+      nix run .#startrend
+
+- Run `QEMU`:
+
+      nix run
+
+- Run renderer on the host:
+
+      rvgpu-proxy -s '1280x800@0,0' -n '10.0.2.2:55667' -n 10.0.2.2:55668 &
+
+## Restrictions and misc. notes
 
 Some features are not tested with this document.  It will be fixed soon:
 
-- `rvgpu-renderer` works with GBM backend.  The document will be enhanced to explain how to test it
-  with the Wayland backend.
+- The "Test Wayland backend" section will be enhanced.
 
 - The sync feature is not tested.  Testing it requires building custom kernel.
   The description of how to do that will be merged soon.
+
+- There is no vduse.h in linuxHeaders_5_10, it is taken from
+  `/nix/store/kmp7p16z94gx9nm80n03j8cp9rllmla2-glibc-2.37-8-dev/include/linux/vduse.h`
