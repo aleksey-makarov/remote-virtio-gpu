@@ -21,7 +21,6 @@ add_executable(rvgpu-proxy
 	gpu/rvgpu-iov.c
 	gpu/libvduse.c
 	gpu/epoll_scheduler.c
-	gpu/backend.c
 	gpu/x_rvgpu-map-guest.c
 	gpu/x_rvgpu-vqueue.c
 	gpu/rvgpu.c

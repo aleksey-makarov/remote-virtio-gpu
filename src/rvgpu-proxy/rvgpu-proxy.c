@@ -29,10 +29,10 @@
 #include <rvgpu-generic/rvgpu-utils.h>
 
 #include "rvgpu-proxy.h"
-#include "gpu/backend.h"
 #include "gpu/rvgpu-gpu-device.h"
 #include "gpu/rvgpu-input-device.h"
 #include "gpu/error.h"
+#include "gpu/rvgpu.h"
 
 #define DEFAULT_WIDTH 800u
 #define DEFAULT_HEIGHT 600u
@@ -93,8 +93,11 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	struct input_device *inpdev;
-	struct rvgpu_backend *b;
+	struct rvgpu_backend b;
+	struct rvgpu_ctx *ctx = &b.ctx;
 	int w, h, x , y;
+	unsigned int backends_initialized;
+	int err;
 
 	static struct gpu_device_params params = {
 		.capset_path = NULL,
@@ -262,32 +265,54 @@ int main(int argc, char **argv)
 		fclose(oom_file);
 	}
 
-	b = init_backend_rvgpu(&ctx_args, sc_args);
-	if (!b) {
-		error("init_backend_rvgpu()");
+	trace("rvgpu_ctx_init()");
+	err = rvgpu_ctx_init(ctx, &ctx_args);
+	if (err < 0) {
+		error("rvgpu_init_ctx()");
 		goto err;
 	}
 
-	inpdev = input_device_init(b);
-	if (!inpdev) {
-		error("input_device_init()");
-		goto err_destroy_backend;
+	for (backends_initialized = 0;
+	     backends_initialized < ctx->scanout_num;
+	     backends_initialized++) {
+		struct rvgpu_scanout *be = &b.scanout[backends_initialized];
+
+		trace("rvgpu_init(%i)", backends_initialized);
+		err = rvgpu_init(ctx, be, &sc_args[backends_initialized]);
+		if (err) {
+			error("rvgpu_init(%u)", backends_initialized);
+			goto err_rvgpu_destroy;
+		}
 	}
 
-	if (gpu_device_main(&params, b) < 0) {
+	inpdev = input_device_init(&b);
+	if (!inpdev) {
+		error("input_device_init()");
+		goto err_rvgpu_destroy;
+	}
+
+	if (gpu_device_main(&params, &b) < 0) {
 		error("gpu_device_main()");
 		goto err_input_device_free;
 	}
 
 	input_device_free(inpdev);
-	destroy_backend_rvgpu(b);
+	for (unsigned int i = 0; i < backends_initialized; i++) {
+		struct rvgpu_scanout *s = &b.scanout[i];
+		rvgpu_destroy(ctx, s);
+	}
+	rvgpu_ctx_destroy(ctx);
 ok:
 	exit(EXIT_SUCCESS);
 
 err_input_device_free:
 	input_device_free(inpdev);
-err_destroy_backend:
-	destroy_backend_rvgpu(b);
+err_rvgpu_destroy:
+	for (unsigned int i = 0; i < backends_initialized; i++) {
+		struct rvgpu_scanout *s = &b.scanout[i];
+		rvgpu_destroy(ctx, s);
+	}
+	rvgpu_ctx_destroy(ctx);
 err:
 	exit(EXIT_FAILURE);
 }

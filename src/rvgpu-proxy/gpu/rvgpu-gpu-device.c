@@ -55,7 +55,6 @@
 #include "../rvgpu-proxy.h"
 #include "rvgpu-iov.h"
 #include "rvgpu-gpu-device.h"
-#include "backend.h"
 #include "error.h"
 #include "rvgpu.h"
 
@@ -106,7 +105,6 @@ struct gpu_device {
 	int vsync_fd;
 	int wait_vsync;
 #endif
-
 
 	size_t max_mem;
 	size_t curr_mem;
