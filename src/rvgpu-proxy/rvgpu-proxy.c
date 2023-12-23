@@ -73,7 +73,8 @@ static void usage(void)
 		"	-M lim		memory limit in MB, should be [%u..%u]\n"
 		"	-R t		connection timeout, should be [%u..%u]\n"
 		"\n"
-		"compiled with linux headers version %d.%d.%d (%d)\n"
+		"linux headers version: %d.%d.%d (%d)\n"
+		"build: %s\n"
 		,
 		CAPSET_PATH,
 		DEFAULT_WIDTH, DEFAULT_HEIGHT, VIRTIO_GPU_MAX_SCANOUTS,
@@ -87,7 +88,13 @@ static void usage(void)
 		(LINUX_VERSION_CODE >> 16) & 0xff,
 		(LINUX_VERSION_CODE >>  8) & 0xff,
 		(LINUX_VERSION_CODE >>  0) & 0xff,
-		LINUX_VERSION_CODE);
+		LINUX_VERSION_CODE,
+#ifdef NDEBUG
+		"Release"
+#else
+		"Debug"
+#endif
+		);
 }
 
 int main(int argc, char **argv)
