@@ -36,7 +36,7 @@ with lib; {
 
     services.getty.autologinUser = "root";
 
-    services.udev.packages = [pkgs.remote-virtio-gpu];
+    services.udev.packages = [pkgs.remote-virtio-gpu-debug];
 
     virtualisation = {
       memorySize = 4 * 1024;
@@ -66,39 +66,48 @@ with lib; {
 
     fonts.packages = with pkgs; [noto-fonts];
 
-    environment.systemPackages = with pkgs; [
-      vim
-      micro
-      wget
-      mc
-      tree
-      tmux
+    environment = with pkgs; {
+      systemPackages = [
+        vim
+        micro
+        wget
+        mc
+        tree
+        tmux
 
-      kmscube
-      glmark2
-      glxinfo
-      mediainfo
-      mesa-demos
-      evtest
+        kmscube
+        glmark2
+        glxinfo
+        mediainfo
+        mesa-demos
+        evtest
 
-      weston
-      vanilla-dmz
+        weston
+        vanilla-dmz
 
-      remote-virtio-gpu
-      # remote-virtio-gpu.src
+        gst_all_1.gstreamer # this is .bin (probably this is a bug)
+        gst_all_1.gstreamer.out
+        gst_all_1.gst-plugins-base
+        gst_all_1.gst-plugins-good
+        gst_all_1.gst-plugins-bad
+        gst_all_1.gst-plugins-ugly
+        gst_all_1.gst-devtools
 
-      uhmitest
+        ffmpeg_6-full
 
-      gst_all_1.gstreamer # this is .bin (probably this is a bug)
-      gst_all_1.gstreamer.out
-      gst_all_1.gst-plugins-base
-      gst_all_1.gst-plugins-good
-      gst_all_1.gst-plugins-bad
-      gst_all_1.gst-plugins-ugly
-      gst_all_1.gst-devtools
+        remote-virtio-gpu-debug
 
-      ffmpeg_6-full
-    ];
+        uhmitest
+
+        gdb
+      ];
+      # See: https://nixos.wiki/wiki/Debug_Symbols
+      # And search https://nixos.org/manual/nixpkgs/stable/ for NIX_DEBUG_INFO_DIRS
+      enableDebugInfo = true;
+      variables = {
+        RVGPU_SRC = "${remote-virtio-gpu-debug.src}";
+      };
+    };
 
     users.mutableUsers = false;
 

@@ -46,7 +46,7 @@
   }: let
     system = "x86_64-linux";
 
-    overlay = _: super: {
+    overlay = self: super: {
       linuxKernel =
         super.linuxKernel
         // {
@@ -54,9 +54,30 @@
             virtio-lo = super.callPackage virtio-lo {};
           }));
         };
-      remote-virtio-gpu = self.packages.${system}.remote-virtio-gpu;
+
+      linuxHeaders_5_10 = super.linuxHeaders.overrideAttrs rec {
+        version = "5.10.191";
+        src = pkgs.fetchurl {
+          url = "mirror://kernel/linux/kernel/v5.x/linux-${version}.tar.xz";
+          hash = "sha256-y1RmDtSRfMT5qauT0Rfe/v2Ly+dF7GCC2Qm7/VrpYsI=";
+        };
+      };
+
+      remote-virtio-gpu = super.callPackage ./default.nix {};
+
+      remote-virtio-gpu-linux_5_10 = self.remote-virtio-gpu.override {
+        linuxHeaders = self.linuxHeaders_5_10;
+      };
+
+      remote-virtio-gpu-debug = self.remote-virtio-gpu.overrideAttrs (_: _: {
+        cmakeBuildType = "Debug";
+        separateDebugInfo = true;
+      });
+
       uhmitest = uhmitest.packages.${system}.uhmitest;
+
       kmscube = kmscube.packages.${system}.kmscube;
+
       glmark2 = super.glmark2.overrideAttrs (attrs: {
         patches = (attrs.patches or []) ++ [./settings/nix/0001-drm-Use-preferred-mode-if-exist.patch];
       });
@@ -144,19 +165,7 @@
     '';
   in {
     packages.${system} = rec {
-      linuxHeaders_5_10 = pkgs.linuxHeaders.overrideAttrs rec {
-        version = "5.10.191";
-        src = pkgs.fetchurl {
-          url = "mirror://kernel/linux/kernel/v5.x/linux-${version}.tar.xz";
-          hash = "sha256-y1RmDtSRfMT5qauT0Rfe/v2Ly+dF7GCC2Qm7/VrpYsI=";
-        };
-      };
-
-      remote-virtio-gpu = pkgs.callPackage ./default.nix {};
-
-      remote-virtio-gpu-linux_5_10 = pkgs.callPackage ./default.nix {
-        linuxHeaders = linuxHeaders_5_10;
-      };
+      inherit (pkgs) linuxHeaders_5_10 remote-virtio-gpu remote-virtio-gpu-linux_5_10 remote-virtio-gpu-debug;
 
       default = remote-virtio-gpu;
     };
