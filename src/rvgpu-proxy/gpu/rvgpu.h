@@ -22,6 +22,8 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 
+#include <linux/virtio_gpu.h>
+
 #define SOCKET_NUM 2
 #define TIMERS_CNT 2
 
@@ -29,8 +31,9 @@
 #define PIPE_READ (0)
 #define PIPE_WRITE (1)
 
+// FIXME: VIRTIO_GPU_MAX_SCANOUTS, MAX_HOSTS sanitize usage of these constants
 /* Maximum number of remote rendering targets */
-#define MAX_HOSTS 16
+#define MAX_HOSTS VIRTIO_GPU_MAX_SCANOUTS
 
 /*
  * rvgpu establishes two connections to remote rendering backend.
@@ -49,6 +52,7 @@ enum reset_state {
 	GPU_RESET_INITIATED,
 };
 
+// FIXME: this is not scanout, it's host! Rename data structs
 struct rvgpu_scanout_arguments {
 	char *ip;
 	char *port;

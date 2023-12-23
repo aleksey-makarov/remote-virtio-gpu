@@ -16,16 +16,11 @@
  */
 
 #include <assert.h>
-#include <dlfcn.h>
-#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/epoll.h>
-#include <sys/poll.h>
 #include <unistd.h>
 
 #include <librvgpu/rvgpu-protocol.h>
@@ -65,29 +60,40 @@
 static void usage(void)
 {
 	fprintf(stderr,
-	       "Usage: rvgpu-proxy [options]\n"
-	       "	-c capset	specify capset file (default: %s)\n"
-	       "	-s scanout	specify scanout in form WxH@X,Y (default: %ux%u@0,0)\n"
+		"Usage: rvgpu-proxy [options]\n"
+		"	-c capset	specify capset file (default: %s)\n"
+		"	-s scanout	specify scanout in form WxH@X,Y (default: %ux%u@0,0), max %u scanouts\n"
+		"			X >= 0, Y >= 0, W > 0, H > 0\n"
 #ifdef VSYNC_ENABLE
-	       "	-f rate		specify virtual framerate (default: disabled)\n"
+		"	-f rate		specify virtual framerate (default: disabled), should be [%u..%u]\n"
 #endif
-	       "	-i index	specify index 'n' for device /dev/dri/card<n>\n"
-	       "	-n		server:port for connecting (max 4 hosts, default: %s:%s)\n"
-	       "	-h		show this message\n"
-	       "\n"
-	       "compiled with linux headers version %d.%d.%d (%d)\n",
-	       CAPSET_PATH, DEFAULT_WIDTH, DEFAULT_HEIGHT,
-	       RVGPU_DEFAULT_HOSTNAME, RVGPU_DEFAULT_PORT,
-	       (LINUX_VERSION_CODE >> 16) & 0xff,
-	       (LINUX_VERSION_CODE >>  8) & 0xff,
-	       (LINUX_VERSION_CODE >>  0) & 0xff,
-	        LINUX_VERSION_CODE);
+		"	-i index	specify index 'n' for device /dev/dri/card<n>, should be [%u..%u]\n"
+		"	-n server:port  renderer for connecting (default: %s:%s), max %d hosts\n"
+		"	-h		show this message\n"
+		"	-M lim		memory limit in MB, should be [%u..%u]\n"
+		"	-R t		connection timeout, should be [%u..%u]\n"
+		"\n"
+		"compiled with linux headers version %d.%d.%d (%d)\n"
+		,
+		CAPSET_PATH,
+		DEFAULT_WIDTH, DEFAULT_HEIGHT, VIRTIO_GPU_MAX_SCANOUTS,
+#ifdef VSYNC_ENABLE
+		FRAMERATE_MIN, FRAMERATE_MAX,
+#endif
+		CARD_INDEX_MIN, CARD_INDEX_MAX - 1,
+		RVGPU_DEFAULT_HOSTNAME, RVGPU_DEFAULT_PORT, MAX_HOSTS,
+		VMEM_MIN_MB, VMEM_MAX_MB,
+		RVGPU_MIN_CONN_TMT_S, RVGPU_MAX_CONN_TMT_S,
+		(LINUX_VERSION_CODE >> 16) & 0xff,
+		(LINUX_VERSION_CODE >>  8) & 0xff,
+		(LINUX_VERSION_CODE >>  0) & 0xff,
+		LINUX_VERSION_CODE);
 }
 
 int main(int argc, char **argv)
 {
 	struct input_device *inpdev;
-	struct rvgpu_backend *rvgpu_be = NULL;
+	struct rvgpu_backend *b;
 	int w, h, x , y;
 
 	static struct gpu_device_params params = {
@@ -113,7 +119,6 @@ int main(int argc, char **argv)
 	struct rvgpu_scanout_arguments sc_args[MAX_HOSTS];
 
 	char path[64];
-	FILE *oomFile;
 	int res, opt;
 	char *ip, *port, *errstr = NULL;
 
@@ -121,8 +126,10 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'c':
 			params.capset_path = strdup(optarg);
-			if (!params.capset_path)
-				err(1, "strdup()");
+			if (!params.capset_path) {
+				error("strdup()");
+				goto err;
+			}
 			break;
 		case 'i':
 			params.card_index =
@@ -130,28 +137,26 @@ int main(int argc, char **argv)
 						     CARD_INDEX_MAX - 1,
 						     &errstr);
 			if (errstr != NULL) {
-				warnx("Card index should be in [%u..%u]\n",
-				      CARD_INDEX_MIN, CARD_INDEX_MAX - 1);
-				errx(1, "Invalid card index %s:%s", optarg,
-				     errstr);
+				error("card index: \'%s\': %s", optarg, errstr);
+				goto err;
 			}
 
-			snprintf(path, sizeof(path), "/dev/dri/card%d",
-				 params.card_index);
+			snprintf(path, sizeof(path), "/dev/dri/card%d", params.card_index);
 			res = access(path, F_OK);
-			if (res == 0)
-				errx(1, "device %s exists", path);
-			else if (errno != ENOENT)
-				err(1, "error while checking device %s", path);
+			if (res == 0) {
+				error("device %s exists", path);
+				goto err;
+			} else if (errno != ENOENT) {
+				error_errno("error while checking device %s", path);
+				goto err;
+			}
 			break;
 		case 'M':
 			params.mem_limit = (unsigned int)sanity_strtonum(
 				optarg, VMEM_MIN_MB, VMEM_MAX_MB, &errstr);
 			if (errstr != NULL) {
-				warnx("Memory limit should be in [%u..%u]\n",
-				      VMEM_MIN_MB, VMEM_MAX_MB);
-				errx(1, "Invalid memory limit %s:%s", optarg,
-				     errstr);
+				error("memory limit: \'%s\': %s", optarg, errstr);
+				goto err;
 			}
 			break;
 		case 'f':
@@ -159,23 +164,24 @@ int main(int argc, char **argv)
 			params.framerate = (unsigned long)sanity_strtonum(
 				optarg, FRAMERATE_MIN, FRAMERATE_MAX, &errstr);
 			if (errstr != NULL) {
-				warnx("Framerate should be in [%u..%u]\n",
-				      FRAMERATE_MIN, FRAMERATE_MAX);
-				errx(1, "Invalid framerate %s:%s", optarg,
-				     errstr);
+				error("frame rate: \'%s\': %s", optarg, errstr);
+				goto err;
 			}
+			break;
 #else
 			error("VSYNC is not supported");
-			exit(EXIT_FAILURE);
+			goto err;
 #endif
-			break;
 		case 's':
 			if (params.num_scanouts >= VIRTIO_GPU_MAX_SCANOUTS) {
-				errx(1, "too many scanouts, max is %d",
-				     VIRTIO_GPU_MAX_SCANOUTS);
+				error("too many scanouts");
+				goto err;
 			}
-			if (sscanf(optarg, "%dx%d@%d,%d", &w, &h, &x, &y) == 4u) {
-				if (w > 0 && h > 0 && x >= 0 && y >= 0){
+			res = sscanf(optarg, "%dx%d@%d,%d", &w, &h, &x, &y);
+			if (res != 4u || !(w > 0 && h > 0 && x >= 0 && y >= 0)) {
+					error( "invalid scanout configuration \'%s\'", optarg);
+					goto err;
+			} else {
 					params.dpys[params.num_scanouts].r.width = (uint32_t)w;
 					params.dpys[params.num_scanouts].r.height = (uint32_t)h;
 					params.dpys[params.num_scanouts].r.x = (uint32_t)x;
@@ -183,30 +189,21 @@ int main(int argc, char **argv)
 					params.dpys[params.num_scanouts].enabled = 1;
 					params.dpys[params.num_scanouts].flags = 1;
 					params.num_scanouts++;
-				} else {
-					errx(1, "invalid scanout configuration %s, width and height "
-						"values must be greater than zero, x y position must be "
-						"greater or equal zero", optarg);
-				}
-			
-			} else {
-				errx(1, "invalid scanout configuration %s",
-				     optarg);
 			}
 			break;
 		case 'n':
 			ip = strtok(optarg, ":");
 			if (ip == NULL) {
-				warnx("Pass a valid IPv4 address and port\n");
-				err(1, "Incorrect format for server:port");
+				error("invalid server:port \'%s\'", optarg);
+				goto err;
 			}
 			port = strtok(NULL, "");
 			if (port == NULL)
 				port = RVGPU_DEFAULT_PORT;
 
-			if (ctx_args.scanout_num == MAX_HOSTS) {
-				errx(1, "Only upto %d hosts are supported.",
-				     MAX_HOSTS);
+			if (ctx_args.scanout_num >= MAX_HOSTS) {
+				error("too many hosts");
+				goto err;
 			}
 
 			sc_args[ctx_args.scanout_num].ip = ip;
@@ -218,19 +215,16 @@ int main(int argc, char **argv)
 				optarg, RVGPU_MIN_CONN_TMT_S,
 				RVGPU_MAX_CONN_TMT_S, &errstr);
 			if (errstr != NULL) {
-				warnx("Conn timeout should be in [%u..%u]\n",
-				      RVGPU_MIN_CONN_TMT_S,
-				      RVGPU_MAX_CONN_TMT_S);
-				errx(1, "Invalid conn timeout %s:%s", optarg,
-				     errstr);
+				error("invalid conn timeout \'%s\': %s", optarg, errstr);
+				goto err;
 			}
 			break;
 		case 'h':
 			usage();
-			exit(EXIT_SUCCESS);
+			goto ok;
 		default:
 			usage();
-			exit(EXIT_FAILURE);
+			goto err;
 		}
 	}
 
@@ -243,28 +237,57 @@ int main(int argc, char **argv)
 	if (params.num_scanouts == 0)
 		params.num_scanouts = 1;
 
-	/* change oom_score_adj to be very less likely killed */
-	oomFile = fopen("/proc/self/oom_score_adj", "w");
-	if (oomFile == NULL) {
-		err(1, "fopen /proc/self/oom_score_adj");
-	} else {
-		fprintf(oomFile, "%d", -1000);
-		fclose(oomFile);
+	trace("num_scanouts: %u", params.num_scanouts);
+	for (unsigned int s = 0; s < params.num_scanouts; s++) {
+		trace("- %ux%u@%u,%u",
+		      params.dpys[s].r.width,
+		      params.dpys[s].r.height,
+		      params.dpys[s].r.x,
+		      params.dpys[s].r.y);
+	}
+	trace("num renderers: %u", ctx_args.scanout_num);
+	for (unsigned int r = 0; r < ctx_args.scanout_num; r++) {
+		trace("- %s:%s", sc_args[r].ip, sc_args[r].port);
 	}
 
-	rvgpu_be = init_backend_rvgpu(&ctx_args, sc_args);
-	assert(rvgpu_be);
+	/* change oom_score_adj to be very less likely killed */
+#define OOM_SCORE_ADJ "/proc/self/oom_score_adj"
+	{
+		FILE *oom_file = fopen(OOM_SCORE_ADJ, "w");
+		if (oom_file == NULL) {
+			error_errno("fopen(%s)", OOM_SCORE_ADJ);
+			goto err;
+		}
+		fprintf(oom_file, "%d", -1000);
+		fclose(oom_file);
+	}
 
-	inpdev = input_device_init(rvgpu_be);
-	if (!inpdev)
-		err(1, "input device init");
+	b = init_backend_rvgpu(&ctx_args, sc_args);
+	if (!b) {
+		error("init_backend_rvgpu()");
+		goto err;
+	}
 
-	int ret = gpu_device_main(&params, rvgpu_be);
-	if (ret)
-		err(1, "gpu_device_main()");
+	inpdev = input_device_init(b);
+	if (!inpdev) {
+		error("input_device_init()");
+		goto err_destroy_backend;
+	}
+
+	if (gpu_device_main(&params, b) < 0) {
+		error("gpu_device_main()");
+		goto err_input_device_free;
+	}
 
 	input_device_free(inpdev);
-	destroy_backend_rvgpu(rvgpu_be);
-
+	destroy_backend_rvgpu(b);
+ok:
 	exit(EXIT_SUCCESS);
+
+err_input_device_free:
+	input_device_free(inpdev);
+err_destroy_backend:
+	destroy_backend_rvgpu(b);
+err:
+	exit(EXIT_FAILURE);
 }
