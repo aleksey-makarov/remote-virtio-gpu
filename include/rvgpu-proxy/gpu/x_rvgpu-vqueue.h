@@ -45,7 +45,6 @@ struct vqueue_request {
 	struct vqueue *q;
 
 	bool mapped;
-	unsigned int refcount;
 };
 
 /**
@@ -57,39 +56,7 @@ static inline bool vqueue_are_requests_available(struct vqueue *q)
 	return q->last_avail_idx != q->vr.avail->idx;
 }
 
-/**
- * @brief Increase the reference count of the request
- * @param q - a reference to the request
- * @retval a new reference to the request
- */
-static inline struct vqueue_request *
-vqueue_request_ref(struct vqueue_request *req)
-{
-	req->refcount++;
-	return req;
-}
-
-/**
- * @brief Decrease the reference count of the request
- * @param q - a reference to the request
- */
-void vqueue_request_unref(struct vqueue_request *req);
-
-/**
- * @brief Get next request from the vqueue
- * @param vilo - descriptor needed for memory mapping
- * @param q - queue to get requests from
- * @retval a new request
- */
-struct vqueue_request *vqueue_get_request(int vilo, struct vqueue *q);
-
-/**
- * @brief Send response to certain request
- * @param req - request to send reply to
- * @param resp - response buffer
- * @param resp_len - size of response buffer
- */
-void vqueue_send_response(struct vqueue_request *req, void *resp,
-			  size_t resp_len);
+int vqueue_get_request(int vilo, struct vqueue *q, struct vqueue_request *req);
+void vqueue_send_response(struct vqueue_request *req, size_t resp_len);
 
 #endif /* RVGPU_VQUEUE_H */

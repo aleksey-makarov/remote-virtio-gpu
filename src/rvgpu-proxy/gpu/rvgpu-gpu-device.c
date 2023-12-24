@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include <linux/virtio_config.h>
 #include <linux/virtio_gpu.h>
@@ -81,20 +82,8 @@ struct gpu_capdata {
 	uint8_t data[CAPSET_MAX_SIZE];
 };
 
-struct cmd {
-	struct virtio_gpu_ctrl_hdr hdr;
-	struct vqueue_request *req;
-
-	TAILQ_ENTRY(cmd) cmds;
-};
-
 #define PIPE_READ (0)
 #define PIPE_WRITE (1)
-
-struct async_resp {
-	TAILQ_HEAD(, cmd) async_cmds;
-	int fence_pipe[2];
-};
 
 struct gpu_device {
 	int lo_fd;
@@ -122,8 +111,84 @@ struct gpu_device {
 
 	struct vqueue vq[2];
 	struct rvgpu_backend *backend;
-	struct async_resp *async_resp;
+
+	struct proxy_backend *proxy;
 };
+
+/*
+ * proxy backend begin
+ */
+
+struct proxy_backend_request;
+
+struct proxy_backend {
+	struct rvgpu_backend *b;
+
+	TAILQ_HEAD(, proxy_backend_request) async_cmds;
+	int fence_pipe[2];
+};
+
+typedef void (*proxy_backend_request_reply_t)(struct proxy_backend_request *);
+
+struct proxy_backend_request {
+
+	// r - guest to device
+	// w - device to guest
+
+	unsigned int nr;
+	unsigned int nw;
+	struct iovec *r;
+	struct iovec *w;
+	size_t resp_len;
+	proxy_backend_request_reply_t reply;
+
+	// private:
+	struct virtio_gpu_ctrl_hdr hdr;
+	TAILQ_ENTRY(proxy_backend_request) cmds;
+};
+
+void proxy_backend_done(struct proxy_backend *p)
+{
+	assert(p);
+
+	// FIXME reply to all the queries in the queue instead this
+	assert(TAILQ_EMPTY(&p->async_cmds));
+
+	close(p->fence_pipe[PIPE_READ]);
+	close(p->fence_pipe[PIPE_WRITE]);
+
+	free(p);
+}
+
+struct proxy_backend *proxy_backend_init(struct rvgpu_backend *b)
+{
+	assert(b);
+
+	struct proxy_backend *p = malloc(sizeof(*p));
+	if (!p) {
+		error("malloc(struct proxy_backend)");
+		return NULL;
+	}
+	p->b = b;
+
+	TAILQ_INIT(&p->async_cmds);
+
+	int err = pipe(p->fence_pipe);
+	if (err < 0) {
+		error_errno("pipe()");
+		goto err;
+	}
+
+	return p;
+
+err:
+	free(p);
+	return NULL;
+}
+
+/*
+ * proxy backend end
+ */
 
 #ifdef VSYNC_ENABLE
 /* Check if we are being ran on old enough kernel */
@@ -238,65 +303,34 @@ done:
 	g->config.num_capsets = i;
 }
 
+static void reply_header(struct proxy_backend_request *r)
+{
+	copy_to_iov(r->w, r->nw, &r->hdr, sizeof(r->hdr));
+	r->resp_len = sizeof(r->hdr);
+	r->reply(r);
+}
+
 static size_t process_fences(struct gpu_device *g, uint32_t fence_id)
 {
-	struct async_resp *r = g->async_resp;
-	struct cmd *cmd;
+	assert(g);
+	assert(g->proxy);
+
+	struct proxy_backend *p = g->proxy;
+	struct proxy_backend_request *r;
 	size_t processed = 0;
 
-	TAILQ_FOREACH(cmd, &r->async_cmds, cmds)
+	TAILQ_FOREACH(r, &p->async_cmds, cmds)
 	{
-		if ((cmd->hdr.fence_id > fence_id) ||
-		    (cmd->hdr.flags & VIRTIO_GPU_FLAG_VSYNC))
+		if ((r->hdr.fence_id > fence_id) ||
+		    (r->hdr.flags & VIRTIO_GPU_FLAG_VSYNC))
 			continue;
 
-		vqueue_send_response(cmd->req, &cmd->hdr, sizeof(cmd->hdr));
-		TAILQ_REMOVE(&r->async_cmds, cmd, cmds);
-		free(cmd);
+		TAILQ_REMOVE(&p->async_cmds, r, cmds);
+		reply_header(r);
 		processed++;
 	}
 
 	return processed;
-}
-
-static void add_resp(struct gpu_device *g, struct virtio_gpu_ctrl_hdr *hdr,
-	      struct vqueue_request *req)
-{
-	struct async_resp *r = g->async_resp;
-	struct cmd *cmd;
-
-	cmd = (struct cmd *)calloc(1, sizeof(*cmd));
-	assert(cmd);
-
-	memcpy(&cmd->hdr, hdr, sizeof(*hdr));
-	cmd->req = req;
-
-	TAILQ_INSERT_TAIL(&r->async_cmds, cmd, cmds);
-}
-
-static void destroy_async_resp(struct gpu_device *g)
-{
-	struct async_resp *r = g->async_resp;
-
-	close(r->fence_pipe[PIPE_READ]);
-	close(r->fence_pipe[PIPE_WRITE]);
-
-	free(r);
-}
-
-static struct async_resp *init_async_resp(void)
-{
-	struct async_resp *r;
-
-	r = (struct async_resp *)calloc(1, sizeof(*r));
-	assert(r);
-
-	TAILQ_INIT(&r->async_cmds);
-
-	if (pipe(r->fence_pipe) == -1)
-		err(1, "pipe creation error");
-
-	return r;
 }
 
 /**
@@ -324,14 +358,14 @@ static void gpu_device_send_command(struct rvgpu_backend *u, void *buf,
 
 	if (notify_all) {
 		if (rvgpu_ctx_send(&u->ctx, buf, size)) {
-			warn("short write");
+			error("short write");
 		}
 	} else {
 		s = &u->scanout[0];
 		ret = rvgpu_send(s, COMMAND, buf, size);
 
 		if (ret != (int)size)
-			warn("short write");
+			error("short write");
 	}
 }
 
@@ -405,8 +439,13 @@ static void resource_transfer(struct gpu_device *g, struct rvgpu_scanout *s)
 
 static void *resource_thread_func(void *param)
 {
+	assert(param);
 	struct gpu_device *g = (struct gpu_device *)param;
-	struct async_resp *r = (struct async_resp *)g->async_resp;
+
+	assert(g->backend);
+	assert(g->proxy);
+
+	struct proxy_backend *p = g->proxy;
 	struct rvgpu_backend *b = g->backend;
 	struct rvgpu_res_message_header msg;
 	short int revents[MAX_HOSTS];
@@ -450,7 +489,7 @@ static void *resource_thread_func(void *param)
 					if (recv_fence_flags[recv_scanout_id] ==
 					    1) {
 						ret = write_all(
-							r->fence_pipe[PIPE_WRITE],
+							p->fence_pipe[PIPE_WRITE],
 							&sync_fence_id,
 							sizeof(sync_fence_id));
 						assert(ret >= 0);
@@ -553,8 +592,8 @@ static struct gpu_device *gpu_device_init(int lo_fd, int efd, int capset,
 		  &(struct epoll_event){ .events = EPOLLIN,
 					 .data = { .u32 = PROXY_GPU_QUEUES } });
 
-	g->async_resp = init_async_resp();
-	epoll_ctl(efd, EPOLL_CTL_ADD, g->async_resp->fence_pipe[PIPE_READ],
+	g->proxy = proxy_backend_init(b);
+	epoll_ctl(efd, EPOLL_CTL_ADD, g->proxy->fence_pipe[PIPE_READ],
 		  &(struct epoll_event){ .events = EPOLLIN,
 					 .data = { .u32 = PROXY_GPU_QUEUES } });
 
@@ -571,6 +610,8 @@ static void gpu_device_free(struct gpu_device *g)
 {
 	unsigned int i;
 
+	proxy_backend_done(g->proxy);
+
 	for (i = 0u; i < 2u; i++) {
 		struct vring *vr = &g->vq[i].vr;
 
@@ -584,7 +625,6 @@ static void gpu_device_free(struct gpu_device *g)
 #endif
 	close(g->config_fd);
 	close(g->kick_fd);
-	destroy_async_resp(g);
 
 	free(g);
 }
@@ -645,7 +685,7 @@ static void gpu_device_send_patched(struct gpu_device *g,
 	struct rvgpu_backend *b = g->backend;
 
 	if (rvgpu_ctx_transfer_to_host(&b->ctx, t, res)) {
-		warn("short write");
+		error("rvgpu_ctx_transfer_to_host() (short write)");
 	}
 }
 
@@ -822,63 +862,35 @@ static uint64_t gpu_device_read_vsync(struct gpu_device *g)
 
 static size_t gpu_device_serve_vsync(struct gpu_device *g)
 {
-	struct async_resp *r = g->async_resp;
-	struct cmd *cmd;
+	struct proxy_backend *p = g->proxy;
+	struct proxy_backend_request *r;
 	size_t processed = 0;
 
-	TAILQ_FOREACH(cmd, &r->async_cmds, cmds)
+	TAILQ_FOREACH(r, &p->async_cmds, cmds)
 	{
-		if (cmd->hdr.flags & VIRTIO_GPU_FLAG_VSYNC) {
-			vqueue_send_response(cmd->req, &cmd->hdr, sizeof(cmd->hdr));
-			TAILQ_REMOVE(&r->async_cmds, cmd, cmds);
-			free(cmd);
+		if (r->hdr.flags & VIRTIO_GPU_FLAG_VSYNC) {
+			TAILQ_REMOVE(&p->async_cmds, r, cmds);
+			reply_header(r);
 			processed++;
 		}
 	}
 	return processed;
 }
-
-static void gpu_device_trigger_vsync(struct gpu_device *g,
-				     struct virtio_gpu_ctrl_hdr *hdr,
-				     struct vqueue_request *req,
-				     unsigned int flags,
-				     struct timespec vsync_ts)
-{
-	if (!(flags & VIRTIO_GPU_FLAG_VSYNC))
-		return;
-
-	hdr->flags |= VIRTIO_GPU_FLAG_VSYNC;
-	/* use padding bytes to pass scanout_id to virtio-gpu driver */
-	hdr->padding = g->scan_id;
-	add_resp(g, hdr, req);
-
-	if ((!vsync_ts.tv_sec) && (!vsync_ts.tv_nsec)) {
-		set_timer(g->vsync_fd, g->params->framerate, 0);
-	} else {
-		struct timespec now;
-
-		clock_gettime(CLOCK_REALTIME, &now);
-		set_timer(g->vsync_fd, g->params->framerate,
-			  delta_time_nsec(vsync_ts, now));
-	}
-
-	g->wait_vsync = 1;
-}
 #endif
 
 static int gpu_device_serve_fences(struct gpu_device *g)
 {
-	struct async_resp *r = g->async_resp;
+	struct proxy_backend *p = g->proxy;
 	struct pollfd pfd;
 	int processed = 0;
 	uint32_t fence_id;
 
-	pfd.fd = r->fence_pipe[PIPE_READ];
+	pfd.fd = p->fence_pipe[PIPE_READ];
 	pfd.events = POLLIN;
 
 	while (poll(&pfd, 1, 0) > 0) {
 		if (pfd.revents & POLLIN) {
-			int rc = read_all(r->fence_pipe[PIPE_READ], &fence_id,
+			int rc = read_all(p->fence_pipe[PIPE_READ], &fence_id,
 					  sizeof(fence_id));
 			if (rc != sizeof(fence_id))
 				warnx("read error: %d", rc);
@@ -897,44 +909,37 @@ union virtio_gpu_resp {
 	uint8_t data[4096];
 };
 
-static void gpu_device_serve_ctrl(struct gpu_device *g)
+/*
+ * proxy backend begin
+ */
+
+int proxy_backend_go(struct gpu_device *g, struct proxy_backend_request *req, bool *reset)
 {
+	assert(g);
+	assert(g->backend);
+	assert(g->proxy);
+	assert(req->reply);
+	assert(req->r);
+	assert(req->w);
+
+	struct proxy_backend *p = g->proxy;
 	struct rvgpu_backend *b = g->backend;
-	int kick = 0;
-	static bool reset;
 
 	static union virtio_gpu_cmd cmd;
 	static union virtio_gpu_resp resp;
 
-	memset(&resp.hdr, 0, sizeof(resp.hdr));
-#ifdef VSYNC_ENABLE
-	if (g->wait_vsync) {
-		if (gpu_device_read_vsync(g) > 0u) {
-			g->wait_vsync = 0;
-			kick += gpu_device_serve_vsync(g);
-			set_timer(g->vsync_fd, 0, 0);
-		}
-	}
-#endif
-	kick += gpu_device_serve_fences(g);
-	while (1) {
-		struct vqueue_request *req;
-		size_t resp_len = sizeof(resp.hdr);
+		req->resp_len = sizeof(resp.hdr);
+
 		struct rvgpu_header rhdr = {
 			.idx = 0,
 			.flags = 0,
 		};
 
-		if (!vqueue_are_requests_available(&g->vq[0]))
-			break;
-
-		req = vqueue_get_request(g->lo_fd, &g->vq[0]);
-		if (!req)
-			errx(1, "out of memory");
-
-		rhdr.size = (uint32_t)iov_size(req->r, req->nr),
+		rhdr.size = (uint32_t)iov_size(req->r, req->nr);
 
 		copy_from_iov(req->r, req->nr, &cmd, sizeof(cmd));
+
+		memset(&resp.hdr, 0, sizeof(resp.hdr));
 
 		resp.hdr.flags = 0;
 		resp.hdr.fence_id = 0;
@@ -944,11 +949,13 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 			bool notify_all = true;
 			size_t i;
 
+			// FIXME (???) move to the end of the function???
 			if (cmd.hdr.flags & VIRTIO_GPU_FLAG_FENCE) {
 				resp.hdr.flags = VIRTIO_GPU_FLAG_FENCE;
 				resp.hdr.fence_id = cmd.hdr.fence_id;
 				resp.hdr.ctx_id = cmd.hdr.ctx_id;
-				add_resp(g, &resp.hdr, vqueue_request_ref(req));
+				memcpy(&req->hdr, &resp.hdr, sizeof(resp.hdr));
+				TAILQ_INSERT_TAIL(&p->async_cmds, req, cmds);
 			}
 
 			if (cmd.hdr.type == VIRTIO_GPU_CMD_TRANSFER_FROM_HOST_3D)
@@ -966,11 +973,14 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 			/* command is sane, parse it */
 			switch (cmd.hdr.type) {
 			case VIRTIO_GPU_CMD_GET_DISPLAY_INFO:
+				// FIXME: g
+				// FIXME: - copy the full length of pmodes
+				//        - check that `dpy` was initialized correspondingly
 				memcpy(resp.rdi.pmodes, g->params->dpys,
 				       g->params->num_scanouts *
 					       sizeof(struct virtio_gpu_display_one));
 				resp.hdr.type = VIRTIO_GPU_RESP_OK_DISPLAY_INFO;
-				resp_len = sizeof(resp.rdi);
+				req->resp_len = sizeof(resp.rdi);
 				break;
 			case VIRTIO_GPU_CMD_RESOURCE_CREATE_2D:
 				resp.hdr.type = gpu_device_create_res(
@@ -992,6 +1002,7 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 						.target     = cmd.r_c3d.target,
 						.width      = cmd.r_c3d.width,
 						.height     = cmd.r_c3d.height,
+
 						.depth      = cmd.r_c3d.depth,
 						.array_size = cmd.r_c3d.array_size,
 						.format     = cmd.r_c3d.format,
@@ -1002,32 +1013,57 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 			case VIRTIO_GPU_CMD_RESOURCE_UNREF:
 				resp.hdr.type = gpu_device_destroy_res(
 					g, cmd.r_unref.resource_id);
+
 				break;
 			case VIRTIO_GPU_CMD_SET_SCANOUT:
 				if (cmd.s_set.scanout_id == 0)
 					g->scanres = cmd.s_set.resource_id;
 				g->scan_id = cmd.s_set.scanout_id;
 				break;
-			case VIRTIO_GPU_CMD_RESOURCE_FLUSH:
+			case VIRTIO_GPU_CMD_RESOURCE_FLUSH: {
 #ifdef VSYNC_ENABLE
-				if (cmd.r_flush.resource_id == g->scanres) {
-					static struct timespec vsync_ts;
-					if (gpu_device_read_vsync(g) == 0) {
-						gpu_device_trigger_vsync(
-							g, &resp.hdr, vqueue_request_ref(req),
-							cmd.hdr.flags, vsync_ts);
-						clock_gettime(CLOCK_REALTIME,
-							      &vsync_ts);
+				// FIXME: note it's static
+				static struct timespec vsync_ts;
+
+				if (cmd.r_flush.resource_id != g->scanres)
+					break;
+
+				if (gpu_device_read_vsync(g) != 0)
+					break;
+
+				// gpu_device_trigger_vsync()
+				if (cmd.hdr.flags & VIRTIO_GPU_FLAG_VSYNC) {
+					resp.hdr.flags |= VIRTIO_GPU_FLAG_VSYNC;
+					/* use padding bytes to pass scanout_id to virtio-gpu driver */
+					resp.hdr.padding = g->scan_id;
+
+					// add_resp(g, hdr, req);
+					memcpy(&req->hdr, &resp.hdr, sizeof(resp.hdr));
+					TAILQ_INSERT_TAIL(&p->async_cmds, req, cmds);
+
+					if ((!vsync_ts.tv_sec) && (!vsync_ts.tv_nsec)) {
+						// for the first time
+						set_timer(g->vsync_fd, g->params->framerate, 0);
+					} else {
+						struct timespec now;
+
+						clock_gettime(CLOCK_REALTIME, &now);
+						set_timer(g->vsync_fd, g->params->framerate, delta_time_nsec(vsync_ts, now));
 					}
+					g->wait_vsync = 1;
 				}
+
+				clock_gettime(CLOCK_REALTIME, &vsync_ts);
 #endif
 				break;
+			}
 			case VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D:
 				resp.hdr.type = gpu_device_send_res(
 					g, cmd.t_2h2d.resource_id,
 					&(struct rvgpu_res_transfer){
 						.x      = cmd.t_2h2d.r.x,
 						.y      = cmd.t_2h2d.r.y,
+
 						.w      = cmd.t_2h2d.r.width,
 						.h      = cmd.t_2h2d.r.height,
 						.offset = cmd.t_2h2d.offset,
@@ -1062,10 +1098,10 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 				resp.hdr.type = gpu_device_capset_info(
 					g, cmd.capset_info.capset_index,
 					&resp.ci);
-				resp_len = sizeof(resp.ci);
+				req->resp_len = sizeof(resp.ci);
 				break;
 			case VIRTIO_GPU_CMD_GET_CAPSET:
-				resp_len = gpu_device_capset(
+				req->resp_len = gpu_device_capset(
 					g, cmd.capset.capset_id,
 					cmd.capset.capset_version, &resp.c);
 				break;
@@ -1073,18 +1109,121 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 				break;
 			}
 		}
+
 		if (rvgpu_ctx_get_reset_state(&b->ctx)) {
 			resp.hdr.type = VIRTIO_GPU_RESP_ERR_DEVICE_RESET;
-			reset = true;
+			*reset = true;
 		}
+
 		if ((!(resp.hdr.flags & VIRTIO_GPU_FLAG_FENCE)) &&
 		    (!(resp.hdr.flags & VIRTIO_GPU_FLAG_VSYNC))) {
-			vqueue_send_response(req, &resp, resp_len);
-			kick++;
-		} else {
-			vqueue_request_unref(req);
+				copy_to_iov(req->w, req->nw, &resp, req->resp_len);
+				req->reply(req);
+				return 1;
+		}
+
+	return 0;
+}
+
+/*
+ * proxy backend end
+ */
+
+/*
+ * vqueue/backend shim begin
+ * Backend receives struct `proxy_backend_request` where r/nr contains the request.
+ * It should
+ *   - fill up the w/nw with reply
+ *   - set resp_len to the length of reply
+ *   - call reply()
+ * It uses private fields for bookkeeping, do not touch/initialize them.
+ */
+
+struct request {
+	struct proxy_backend_request br;
+	struct vqueue_request vr;
+};
+
+// FIXME: move to header, use with the one from vduse_cpu.c
+#define container_of(ptr, type, member) ({                    \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr);  \
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+
+static inline struct request *proxy_backend_request_to_request(struct proxy_backend_request *br)
+{
+	return container_of(br, struct request, br);
+}
+
+static void reply_request(struct proxy_backend_request *br)
+{
+	struct request *req = proxy_backend_request_to_request(br);
+	vqueue_send_response(&req->vr, req->br.resp_len);
+	free(req);
+}
+
+static struct proxy_backend_request *get_request(struct gpu_device *g)
+{
+	if (!vqueue_are_requests_available(&g->vq[0]))
+		return NULL;
+
+	struct request *req = malloc(sizeof(struct request));
+	if (!req) {
+		error("malloc()");
+		return NULL;
+	}
+
+	int err = vqueue_get_request(g->lo_fd, &g->vq[0], &req->vr);
+	if (err < 0) {
+		error("vqueue_get_request()");
+		free(req);
+		return NULL;
+	}
+
+	req->br.nr = req->vr.nr;
+	req->br.nw = req->vr.nw;
+	req->br.r  = req->vr.r;
+	req->br.w  = req->vr.w;
+	req->br.reply = reply_request;
+
+	return &req->br;
+}
+
+/*
+ * vqueue/backend shim end
+ */
+
+static void gpu_device_serve_ctrl(struct gpu_device *g)
+{
+	struct rvgpu_backend *b = g->backend;
+	int kick = 0;
+	static bool reset;
+	int err;
+
+#ifdef VSYNC_ENABLE
+	if (g->wait_vsync) {
+		if (gpu_device_read_vsync(g) > 0u) {
+			g->wait_vsync = 0;
+			kick += gpu_device_serve_vsync(g);
+			set_timer(g->vsync_fd, 0, 0);
 		}
 	}
+#endif
+	kick += gpu_device_serve_fences(g);
+
+	while (1) {
+		struct proxy_backend_request *r = get_request(g);
+		if (!r)
+			break;
+
+		err = proxy_backend_go(g, r, &reset);
+		if (err < 0) {
+			error("proxy_backend_go()");
+			// FIXME
+			exit(EXIT_FAILURE);
+		}
+		kick += err;
+	}
+
 	if (kick) {
 		struct virtio_lo_kick k = {
 			.idx = g->idx,
@@ -1093,6 +1232,7 @@ static void gpu_device_serve_ctrl(struct gpu_device *g)
 		if (ioctl(g->lo_fd, VIRTIO_LO_KICK, &k) != 0)
 			warn("ctrl kick failed");
 	}
+
 	if (reset) {
 		struct rvgpu_ctx *ctx = &b->ctx;
 
@@ -1111,9 +1251,9 @@ static void gpu_device_serve_cursor(struct gpu_device *g)
 {
 	struct rvgpu_backend *b = g->backend;
 	int kick = 0;
+	int err;
 
 	while (1) {
-		struct vqueue_request *req;
 		union virtio_gpu_cmd r;
 		struct virtio_gpu_ctrl_hdr resp = { .flags = 0, .fence_id = 0 };
 		struct rvgpu_header rhdr = {
@@ -1124,14 +1264,18 @@ static void gpu_device_serve_cursor(struct gpu_device *g)
 		if (!vqueue_are_requests_available(&g->vq[1]))
 			break;
 
-		req = vqueue_get_request(g->lo_fd, &g->vq[1]);
-		if (!req)
-			errx(1, "out of memory");
+		struct vqueue_request req;
+		err = vqueue_get_request(g->lo_fd, &g->vq[1], &req);
+		if (err < 0) {
+			error("vqueue_get_request()");
+			// FIXME
+			return;
+		}
 
-		size_t cmdsize = iov_size(req->r, req->nr);
+		size_t cmdsize = iov_size(req.r, req.nr);
 		rhdr.size = (uint32_t)cmdsize,
 
-		copy_from_iov(req->r, req->nr, &r, sizeof(r));
+		copy_from_iov(req.r, req.nr, &r, sizeof(r));
 
 		resp.type = sanity_check_gpu_cursor(&r, cmdsize, true);
 		if (resp.type == VIRTIO_GPU_RESP_OK_NODATA) {
@@ -1142,14 +1286,16 @@ static void gpu_device_serve_cursor(struct gpu_device *g)
 			}
 
 			gpu_device_send_command(b, &rhdr, sizeof(rhdr), true);
-			for (unsigned int i = 0u; i < req->nr; i++) {
-				struct iovec *iov = &req->r[i];
+			for (unsigned int i = 0u; i < req.nr; i++) {
+				struct iovec *iov = &req.r[i];
 
 				gpu_device_send_command(b, iov->iov_base,
 							iov->iov_len, true);
 			}
 		}
-		vqueue_send_response(req, &resp, sizeof(resp));
+
+		copy_to_iov(req.w, req.nw, &resp, sizeof(resp));
+		vqueue_send_response(&req, sizeof(resp));
 		kick = 1;
 	}
 	if (kick) {
