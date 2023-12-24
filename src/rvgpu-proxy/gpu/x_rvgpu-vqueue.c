@@ -25,41 +25,13 @@
 
 #include "rvgpu-iov.h"
 
-static struct vqueue_request *vqueue_init_request(void)
+int vqueue_get_request(int vilo, struct vqueue *q, struct vqueue_request *req)
 {
-	struct vqueue_request *req = calloc(1, sizeof(struct vqueue_request));
-
-	if (!req)
-		return NULL;
-
-	req->idx = 0u;
-	req->nr = req->nw = 0u;
-	req->refcount = 1;
-	req->mapped = false;
-
-	return req;
-}
-
-void vqueue_request_unref(struct vqueue_request *req)
-{
-	req->refcount--;
-	if (req->refcount > 0)
-		return;
-
-	assert(!req->mapped);
-	free(req);
-}
-
-struct vqueue_request *vqueue_get_request(int vilo, struct vqueue *q)
-{
-	struct vqueue_request *req;
-	uint16_t didx;
-
+	assert(q);
+	assert(req);
 	assert(vqueue_are_requests_available(q));
 
-	req = vqueue_init_request();
-	if (!req)
-		return NULL;
+	uint16_t didx;
 
 	atomic_thread_fence(memory_order_seq_cst);
 	req->idx = q->vr.avail->ring[q->last_avail_idx % q->vr.num];
@@ -96,19 +68,19 @@ struct vqueue_request *vqueue_get_request(int vilo, struct vqueue *q)
 	}
 	q->last_avail_idx++;
 	req->mapped = true;
-	return req;
+	return 0;
 }
 
-void vqueue_send_response(struct vqueue_request *req,
-			  void *resp, size_t resp_len)
+void vqueue_send_response(struct vqueue_request *req, size_t resp_len)
 {
+	assert(req);
+	assert(req->mapped);
+
 	struct vqueue *q = req->q;
 	uint16_t idx = atomic_load((atomic_ushort *)&q->vr.used->idx);
 	struct vring_used_elem *el = &q->vr.used->ring[idx % q->vr.num];
 	struct timespec barrier_delay = { .tv_nsec = 10 };
 	size_t i;
-
-	resp_len = copy_to_iov(req->w, req->nw, resp, resp_len);
 
 	for (i = 0; i < req->nr; i++)
 		unmap_guest(req->r[i].iov_base, req->r[i].iov_len);
@@ -128,5 +100,4 @@ void vqueue_send_response(struct vqueue_request *req,
 	atomic_store((atomic_uint *)&el->id, req->idx);
 	idx++;
 	atomic_store((atomic_ushort *)&q->vr.used->idx, idx);
-	vqueue_request_unref(req);
 }
