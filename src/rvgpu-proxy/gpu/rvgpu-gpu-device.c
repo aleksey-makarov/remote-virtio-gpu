@@ -124,7 +124,8 @@ struct proxy_backend_request;
 struct proxy_backend {
 	struct rvgpu_backend *b;
 
-	TAILQ_HEAD(, proxy_backend_request) async_cmds;
+	// FIXME: Use STAILQ_* ???
+	TAILQ_HEAD(async_cmds_struct, proxy_backend_request) async_cmds;
 	int fence_pipe[2];
 };
 
@@ -316,19 +317,26 @@ static size_t process_fences(struct gpu_device *g, uint32_t fence_id)
 	assert(g->proxy);
 
 	struct proxy_backend *p = g->proxy;
-	struct proxy_backend_request *r;
 	size_t processed = 0;
 
-	TAILQ_FOREACH(r, &p->async_cmds, cmds)
-	{
-		if ((r->hdr.fence_id > fence_id) ||
-		    (r->hdr.flags & VIRTIO_GPU_FLAG_VSYNC))
-			continue;
+	struct async_cmds_struct cmds_tmp = TAILQ_HEAD_INITIALIZER(cmds_tmp);
+
+	while (!TAILQ_EMPTY(&p->async_cmds)) {
+		struct proxy_backend_request *r = TAILQ_FIRST(&p->async_cmds);
 
 		TAILQ_REMOVE(&p->async_cmds, r, cmds);
-		reply_header(r);
-		processed++;
+
+		if ((r->hdr.fence_id > fence_id) || (r->hdr.flags & VIRTIO_GPU_FLAG_VSYNC)) {
+			// leave this in the queue
+			TAILQ_INSERT_TAIL(&cmds_tmp, r, cmds);
+		} else {
+			// reply and free
+			reply_header(r);
+			processed++;
+		}
 	}
+
+	TAILQ_CONCAT(&p->async_cmds, &cmds_tmp, cmds);
 
 	return processed;
 }
@@ -863,17 +871,23 @@ static uint64_t gpu_device_read_vsync(struct gpu_device *g)
 static size_t gpu_device_serve_vsync(struct gpu_device *g)
 {
 	struct proxy_backend *p = g->proxy;
-	struct proxy_backend_request *r;
 	size_t processed = 0;
 
-	TAILQ_FOREACH(r, &p->async_cmds, cmds)
-	{
+	struct async_cmds_struct cmds_tmp = TAILQ_HEAD_INITIALIZER(cmds_tmp);
+
+	while (!TAILQ_EMPTY(&p->async_cmds)) {
+		struct proxy_backend_request *r = TAILQ_FIRST(&p->async_cmds);
+		TAILQ_REMOVE(&p->async_cmds, r, cmds);
+
 		if (r->hdr.flags & VIRTIO_GPU_FLAG_VSYNC) {
-			TAILQ_REMOVE(&p->async_cmds, r, cmds);
 			reply_header(r);
 			processed++;
+		} else {
+			TAILQ_INSERT_TAIL(&cmds_tmp, r, cmds);
 		}
 	}
+
+	TAILQ_CONCAT(&p->async_cmds, &cmds_tmp, cmds);
 	return processed;
 }
 #endif
