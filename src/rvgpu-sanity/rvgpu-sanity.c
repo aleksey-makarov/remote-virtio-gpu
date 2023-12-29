@@ -65,45 +65,41 @@ signed long sanity_strtonum(const char *str, signed long min, signed long max,
 	return result;
 }
 
-static const struct {
-	unsigned int type;
-	const char *name;
-} virtio_gpu_commands[] = {
-	{ VIRTIO_GPU_CMD_GET_DISPLAY_INFO, "GET_DISPLAY_INFO" },
-	{ VIRTIO_GPU_CMD_RESOURCE_CREATE_2D, "RESOURCE_CREATE_2D" },
-	{ VIRTIO_GPU_CMD_RESOURCE_UNREF, "RESOURCE_UNREF" },
-	{ VIRTIO_GPU_CMD_SET_SCANOUT, "SET_SCANOUT" },
-	{ VIRTIO_GPU_CMD_RESOURCE_FLUSH, "RESOURCE_FLUSH" },
-	{ VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D, "TRANSFER_TO_HOST_2D" },
-	{ VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING, "RESOURCE_ATTACH_BACKING" },
-	{ VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING, "RESOURCE_DETACH_BACKING" },
-	{ VIRTIO_GPU_CMD_GET_CAPSET_INFO, "GET_CAPSET_INFO" },
-	{ VIRTIO_GPU_CMD_GET_CAPSET, "GET_CAPSET" },
-
-	/* 3d commands */
-	{ VIRTIO_GPU_CMD_CTX_CREATE, "CTX_CREATE" },
-	{ VIRTIO_GPU_CMD_CTX_DESTROY, "CTX_DESTROY" },
-	{ VIRTIO_GPU_CMD_CTX_ATTACH_RESOURCE, "CTX_ATTACH_RESOURCE" },
-	{ VIRTIO_GPU_CMD_CTX_DETACH_RESOURCE, "CTX_DETACH_RESOURCE" },
-	{ VIRTIO_GPU_CMD_RESOURCE_CREATE_3D, "RESOURCE_CREATE_3D" },
-	{ VIRTIO_GPU_CMD_TRANSFER_TO_HOST_3D, "TRANSFER_TO_HOST_3D" },
-	{ VIRTIO_GPU_CMD_TRANSFER_FROM_HOST_3D, "TRANSFER_FROM_HOST_3D" },
-	{ VIRTIO_GPU_CMD_SUBMIT_3D, "SUBMIT_3D" },
-
-	/* Cursor commands */
-	{ VIRTIO_GPU_CMD_MOVE_CURSOR, "MOVE_CURSOR" },
-	{ VIRTIO_GPU_CMD_UPDATE_CURSOR, "UPDATE_CURSOR" },
-};
-
+// Returns NULL if the type is unknown
 const char *sanity_cmd_by_type(unsigned int type)
 {
-	unsigned int i;
+#define _X(n) case VIRTIO_GPU_CMD_ ## n: return #n ; break;
 
-	for (i = 0u; i < ARRAY_SIZE(virtio_gpu_commands); i++) {
-		if (virtio_gpu_commands[i].type == type)
-			return virtio_gpu_commands[i].name;
+	switch (type) {
+	_X(GET_DISPLAY_INFO)
+	_X(RESOURCE_CREATE_2D)
+	_X(RESOURCE_UNREF)
+	_X(SET_SCANOUT)
+	_X(RESOURCE_FLUSH)
+	_X(TRANSFER_TO_HOST_2D)
+	_X(RESOURCE_ATTACH_BACKING)
+	_X(RESOURCE_DETACH_BACKING)
+	_X(GET_CAPSET_INFO)
+	_X(GET_CAPSET)
+
+	/* 3d commands */
+	_X(CTX_CREATE)
+	_X(CTX_DESTROY)
+	_X(CTX_ATTACH_RESOURCE)
+	_X(CTX_DETACH_RESOURCE)
+	_X(RESOURCE_CREATE_3D)
+	_X(TRANSFER_TO_HOST_3D)
+	_X(TRANSFER_FROM_HOST_3D)
+	_X(SUBMIT_3D)
+
+	/* Cursor commands */
+	_X(MOVE_CURSOR)
+	_X(UPDATE_CURSOR)
+
+	default: return NULL;
 	}
-	return "UNKNOWN";
+
+#undef _X
 }
 
 static bool sanity_check_bounds(uint32_t x, uint32_t y, uint32_t width,
