@@ -39,6 +39,8 @@
 #include <rvgpu-renderer/rvgpu-renderer.h>
 #include <rvgpu-renderer/virgl/rvgpu-virgl.h>
 
+#include "error.h"
+
 struct rvgpu_pr_state {
 	struct rvgpu_egl_state *egl;
 	struct rvgpu_pr_params pp;
@@ -49,6 +51,50 @@ struct rvgpu_pr_state {
 	int res_socket;
 	atomic_uint fence_received, fence_sent;
 };
+
+/* --- debug ------------------------------------- */
+
+#define COMMAND_COUNTER_MAX 100
+static unsigned int command_counter = 0;
+
+#define dbg(_format, ...) ({ fprintf(stderr, _format "\n", ##__VA_ARGS__); })
+
+static unsigned int attach_backing_length(
+	struct virtio_gpu_resource_attach_backing *r,
+	struct virtio_gpu_mem_entry entries[])
+{
+	unsigned int length = 0;
+
+	for (unsigned int i = 0; i < r->nr_entries; i++)
+		length += entries[i].length;
+
+	return length;
+}
+
+#define MAX_PRINT 0x100
+#define STR_LEN 16
+static void print_array(const void *a, unsigned int an)
+{
+	unsigned int i;
+	const unsigned char *ca = a;
+
+	for (i = 0; i < an; i++) {
+		if (i % STR_LEN == 0)
+			fprintf(stderr, "  %04x ", i);
+		fprintf(stderr, "%02x ", ca[i]);
+		if (i % STR_LEN == STR_LEN - 1)
+			fprintf(stderr, "\n");
+	}
+	if (i % STR_LEN != 0)
+			fprintf(stderr, "\n");
+}
+
+static void print_rect(const struct virtio_gpu_rect *r)
+{
+	dbg("  %ux%u@%u:%u", r->width, r->height, r->x, r->y);
+}
+
+/* --- debug ------------------------------------- */
 
 static void clear_scanout(struct rvgpu_pr_state *p, struct rvgpu_scanout *s);
 
@@ -303,6 +349,15 @@ static void load_resource_patched(struct rvgpu_pr_state *state, struct iovec *p)
 				  header.len, stream) != header.len) {
 			err(1, "Short read");
 		}
+
+		/* --- debug -------------------------------- */
+
+		if (command_counter <= COMMAND_COUNTER_MAX) {
+			dbg("* PATCH %u@%u", header.len, header.offset);
+			print_array((char *)p[0].iov_base + offset, header.len > MAX_PRINT ? MAX_PRINT : header.len);
+		}
+
+		/* --- debug -------------------------------- */
 	}
 }
 
@@ -525,7 +580,6 @@ static void rvgpu_serve_move_cursor(
 	p->egl->cb->move_cursor(p->egl, c->pos.x, c->pos.y);
 }
 
-
 unsigned int rvgpu_pr_dispatch(struct rvgpu_pr_state *p)
 {
 	static union virtio_gpu_cmd r;
@@ -559,6 +613,79 @@ unsigned int rvgpu_pr_dispatch(struct rvgpu_pr_state *p)
 
 		virgl_renderer_force_ctx_0();
 		virgl_renderer_poll();
+
+		/* --- debug -------------------------------- */
+
+		if (command_counter > COMMAND_COUNTER_MAX)
+			goto debug_end;
+
+		const char * t = sanity_cmd_by_type(r.hdr.type) ?: "???";
+		dbg("* %s %u: size=0x%x flags=0x%x, fence_id=%llu, ctx_id=%u", t, command_counter, uhdr.size, r.hdr.flags, r.hdr.fence_id, r.hdr.ctx_id);
+
+		switch (r.hdr.type) {
+		case VIRTIO_GPU_CMD_SET_SCANOUT:
+			print_rect(&r.s_set.r);
+			dbg("  scanout_id=%u, resource_id=%u", r.s_set.scanout_id, r.s_set.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_CTX_CREATE:
+			if (r.c_create.nlen >= 64) {
+				dbg("  ERROR: nlen=%u", r.c_create.nlen);
+			} else {
+				r.c_create.debug_name[r.c_create.nlen] = 0;
+				dbg("  debug_name=\"%s\"", r.c_create.debug_name);
+			}
+			break;
+		case VIRTIO_GPU_CMD_CTX_DESTROY:
+			break;
+		case VIRTIO_GPU_CMD_CTX_ATTACH_RESOURCE:
+		case VIRTIO_GPU_CMD_CTX_DETACH_RESOURCE:
+			dbg("  resource_id=%u", r.c_res.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_CREATE_2D:
+			dbg("  resource_id=%u, format=%u, width=%u, height=%u",
+				r.r_c2d.resource_id, r.r_c2d.format, r.r_c2d.width, r.r_c2d.height);
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_CREATE_3D:
+			dbg("  resource_id=%u, target=%u, format=%u, bind=%u, width=%u, height=%u",
+				r.r_c3d.resource_id, r.r_c3d.target, r.r_c3d.format, r.r_c3d.bind, r.r_c3d.width, r.r_c3d.height);
+			dbg("  depth=%u, array_size=%u, last_level=%u, nr_samples=%u, flags=%u",
+				r.r_c3d.depth, r.r_c3d.array_size, r.r_c3d.last_level, r.r_c3d.nr_samples, r.r_c3d.flags);
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_UNREF:
+			dbg("  resource_id=%u", r.r_unref.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING:
+			dbg("  resource_id=%u, length=0x%x", r.r_att.resource_id, attach_backing_length(&r.r_att, r.r_mem));
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING:
+			dbg("  resource_id=%u", r.r_det.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_RESOURCE_FLUSH:
+			print_rect(&r.r_flush.r);
+			dbg("  resource_id=%u", r.r_flush.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D:
+			print_rect(&r.t_2h2d.r);
+			dbg("  offset=%llu, resource_id=%u", r.t_2h2d.offset, r.t_2h2d.resource_id);
+			break;
+		case VIRTIO_GPU_CMD_TRANSFER_TO_HOST_3D:
+			dbg("  %ux%ux%u@%u:%u:%u offset=%llu, resource_id=%u, level=%u, stride=%u, layer_stride=%u",
+				r.t_h3d.box.w, r.t_h3d.box.h, r.t_h3d.box.d, r.t_h3d.box.x, r.t_h3d.box.y, r.t_h3d.box.z,
+				r.t_h3d.offset,  r.t_h3d.resource_id, r.t_h3d.level, r.t_h3d.stride, r.t_h3d.layer_stride);
+			break;
+		case VIRTIO_GPU_CMD_SUBMIT_3D:
+			dbg("  size=%u", r.c_submit.size);
+			print_array(r.c_cmdbuf, r.c_submit.size > MAX_PRINT ? MAX_PRINT : r.c_submit.size);
+			break;
+		default:
+			print_array(&r, uhdr.size < MAX_PRINT ? uhdr.size : MAX_PRINT);
+			break;
+		}
+
+		command_counter++;
+debug_end:
+		/* --- debug -------------------------------- */
+
 		switch (r.hdr.type) {
 		case VIRTIO_GPU_CMD_CTX_CREATE:
 			virgl_renderer_context_create(r.hdr.ctx_id,
