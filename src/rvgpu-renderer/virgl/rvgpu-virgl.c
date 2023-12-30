@@ -55,7 +55,7 @@ struct rvgpu_pr_state {
 /* --- debug ------------------------------------- */
 
 #define COMMAND_COUNTER_MAX 100
-static unsigned int command_counter = 0;
+static unsigned int command_counter = 200;
 
 #define dbg(_format, ...) ({ fprintf(stderr, _format "\n", ##__VA_ARGS__); })
 
