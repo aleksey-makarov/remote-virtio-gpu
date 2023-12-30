@@ -5,6 +5,10 @@ TODOs
 	- input
 	- cursor
 - use pthread_cancel() in input subsystem
+	(actually, it's better to use eventfd to signal quitting)
 - sanitize error reporting
 - поправить доки, про nix, рассказать про VSYNC и про `nix run`
 - test VSYNC feature
+- gtk renderer
+- communications library
+- resource cache
