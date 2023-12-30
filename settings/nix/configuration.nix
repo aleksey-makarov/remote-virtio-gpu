@@ -74,6 +74,7 @@ with lib; {
         mc
         tree
         tmux
+        htop
 
         kmscube
         glmark2
