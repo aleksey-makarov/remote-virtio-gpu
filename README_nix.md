@@ -34,10 +34,9 @@ build `remote-virtio-gpu` and `virtio-lo` projects and create the environment.
 After it completes you will be presented a shell environment where all the required
 software is ready to use.
 
-### How to run QEMU inside the development environment
+### How to run QEMU
 
-Among others, there is `startvm.sh` script in the `PATH` of development environment.
-Start it.  Alternatively, this script can be run without entering the development
+QEMU can be run without entering the development
 environment with this `nix` command:
 
     nix run
@@ -52,7 +51,6 @@ You can run
     . /tmp/xchg/tty.sh
 
 to fix terminal settings inside of the serial terminal of the `QEMU`.
-
 
 You can log in to the guest system with `ssh`:
 
