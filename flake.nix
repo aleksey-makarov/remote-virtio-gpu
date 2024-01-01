@@ -172,8 +172,9 @@
 
     devShells.${system} = rec {
       remote-virtio-gpu = pkgs.mkShell {
-        packages = [vscode startvm_sh startrend_sh];
-        inputsFrom = builtins.attrValues self.packages.${system};
+        packages = [vscode];
+        # inputsFrom = [pkgs.remote-virtio-gpu-linux_5_10];
+        inputsFrom = [pkgs.remote-virtio-gpu];
         shellHook = ''
           echo "gst: ${pkgs.gst_all_1.gstreamer}"
           echo "kernel version: ${pkgs.linuxPackages.kernel.modDirVersion}"
