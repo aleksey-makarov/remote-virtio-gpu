@@ -194,6 +194,10 @@
         type = "app";
         program = "${startrend_sh}/bin/startrend.sh";
       };
+      codium = {
+        type = "app";
+        program = "${vscode}/bin/codium";
+      };
       default = startvm;
     };
   };
