@@ -915,6 +915,12 @@ static void gpu_device_uuid(
 
 	uuid_generate(res->uuid);
 
+	{
+		char uuid_str[UUID_STR_LEN];
+		uuid_unparse(res->uuid, uuid_str);
+		trace("new uuid for resource %u: %s", cmd->resource_id, uuid_str);
+	}
+
 	uuid_copy(resp->uuid, res->uuid);
 	resp->hdr.type = VIRTIO_GPU_RESP_OK_RESOURCE_UUID;
 }
@@ -1148,6 +1154,7 @@ int proxy_backend_go(struct gpu_device *g, struct proxy_backend_request *req, bo
 					cmd.capset.capset_version, &resp.c);
 				break;
 			case VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID:
+				trace("VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID");
 				gpu_device_uuid(g, &cmd.uuid, &resp.uuid);
 				req->resp_len = sizeof(resp.uuid);
 				break;
