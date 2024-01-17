@@ -100,8 +100,7 @@
 
     nixos = pkgs.nixos (import ./settings/nix/configuration.nix);
 
-    startvm_sh = pkgs.writeScriptBin "startvm.sh" ''
-      #!${pkgs.bash}/bin/bash
+    startvm_sh = pkgs.writeShellScript "startvm.sh" ''
       ${pkgs.coreutils}/bin/mkdir -p ./xchg
 
       TMPDIR=''$(pwd)
@@ -126,9 +125,7 @@
     renderer_w = 1280;
     wayland_socket_name = "wayland-nix";
 
-    startrend_sh = pkgs.writeScriptBin "startrend.sh" ''
-      #!${pkgs.bash}/bin/bash
-
+    startrend_sh = pkgs.writeShellScript "startrend.sh" ''
       set -x
 
       XDG_RUNTIME_DIR=$(${pkgs.coreutils}/bin/mktemp -d /tmp/xdg-runtime.XXXXXXXX)
@@ -188,11 +185,11 @@
     apps.${system} = rec {
       startvm = {
         type = "app";
-        program = "${startvm_sh}/bin/startvm.sh";
+        program = "${startvm_sh}";
       };
       startrend = {
         type = "app";
-        program = "${startrend_sh}/bin/startrend.sh";
+        program = "${startrend_sh}";
       };
       codium = {
         type = "app";
