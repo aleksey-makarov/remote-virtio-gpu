@@ -21,6 +21,7 @@ with lib; {
     boot = {
       extraModulePackages = with config.boot.kernelPackages; [virtio-lo];
       kernelModules = ["virtio-lo"];
+      # kernelParams = [ "drm.debug=0x006" ];
     };
 
     # from profiles/minimal.nix
