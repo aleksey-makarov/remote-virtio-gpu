@@ -202,6 +202,7 @@ static int rvgpu_pr_readbuf(struct rvgpu_pr_state *p, int stream)
 	while (poll(pfd, n + 1, timeout) == 0 &&
 	       (p->fence_received != p->fence_sent)) {
 		virgl_renderer_poll();
+		// FIXME
 		clock_nanosleep(CLOCK_MONOTONIC, 0, &barrier_delay, NULL);
 
 		if (p->fence_received == p->fence_sent)
