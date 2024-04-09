@@ -74,8 +74,6 @@
         separateDebugInfo = true;
       });
 
-      uhmitest = uhmitest.packages.${system}.uhmitest;
-
       kmscube = kmscube.packages.${system}.kmscube;
 
       glmark2 = super.glmark2.overrideAttrs (attrs: {
@@ -83,7 +81,7 @@
       });
     };
 
-    pkgs = (nixpkgs.legacyPackages.${system}.extend overlay).extend nixGL.overlay;
+    pkgs = ((nixpkgs.legacyPackages.${system}.extend overlay).extend nixGL.overlay).extend uhmitest.overlays.default;
 
     extensions = nix-vscode-extensions.extensions.${system};
 

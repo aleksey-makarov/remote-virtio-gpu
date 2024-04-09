@@ -163,11 +163,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1693402911,
-        "narHash": "sha256-/jIlG4LJxoSmngce/pRkgkaK6ZW2E4uNaexvrnDfXfQ=",
+        "lastModified": 1712655211,
+        "narHash": "sha256-ZZQVrsdX/oDu45rChv+pcVn8BUY1rFfw9Ab969q7/fQ=",
         "owner": "aleksey-makarov",
         "repo": "uhmitest",
-        "rev": "e7672e91c3f345cba696a7b8cf6131c8860e474c",
+        "rev": "d0d3b225a6ce7b3013b0e26f859f78d5cd5d1d86",
         "type": "github"
       },
       "original": {
